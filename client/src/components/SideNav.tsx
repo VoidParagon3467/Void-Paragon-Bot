@@ -38,14 +38,14 @@ export function SideNav({ isOpen, onClose, userRole }: SideNavProps) {
         <div className="p-4 space-y-2">
           {links.map((link) => (
             <Link key={link.href} href={link.href}>
-              <a
-                className="flex items-center gap-3 px-4 py-2 rounded-md hover-elevate text-foreground"
+              <div
+                className="flex items-center gap-3 px-4 py-2 rounded-md hover-elevate text-foreground cursor-pointer"
                 onClick={onClose}
                 data-testid={`link-${link.label.toLowerCase()}`}
               >
                 <link.icon className="w-5 h-5" />
                 <span>{link.label}</span>
-              </a>
+              </div>
             </Link>
           ))}
 
@@ -54,14 +54,14 @@ export function SideNav({ isOpen, onClose, userRole }: SideNavProps) {
               <div className="border-t border-border my-4" />
               {adminLinks.map((link) => (
                 <Link key={link.href} href={link.href}>
-                  <a
-                    className="flex items-center gap-3 px-4 py-2 rounded-md hover-elevate text-primary"
+                  <div
+                    className="flex items-center gap-3 px-4 py-2 rounded-md hover-elevate text-primary cursor-pointer"
                     onClick={onClose}
                     data-testid={`link-${link.label.toLowerCase().replace(' ', '-')}`}
                   >
                     <link.icon className="w-5 h-5" />
                     <span>{link.label}</span>
-                  </a>
+                  </div>
                 </Link>
               ))}
             </>
