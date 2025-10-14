@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard • Vøid Pæragon</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <style>
+    body {
+      background: #000;
+      color: #ddd;
+      font-family: "Poppins", sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      text-align: center;
+      padding: 1rem 0;
+      border-bottom: 2px solid #7a00ff;
+    }
+
+    header h1 {
+      color: #7a00ff;
+      font-family: "Cinzel", serif;
+    }
+
+    main {
+      margin-left: 220px;
+      padding: 2rem;
+    }
+
+    h2 {
+      color: #9b59b6;
+      border-bottom: 1px solid #333;
+      padding-bottom: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .card {
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 0 10px rgba(122, 0, 255, 0.2);
+    }
+
+    .card h3 {
+      color: #7a00ff;
+      margin-bottom: 0.5rem;
+    }
+
+    button {
+      background: #7a00ff;
+      border: none;
+      color: #fff;
+      border-radius: 5px;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover { opacity: 0.8; }
+
+    .hidden { display: none; }
+
+    /* === Floating Side Menu === */
+    #sideMenu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 200px;
+      background: rgba(15, 15, 15, 0.97);
+      border-right: 2px solid #7a00ff;
+      padding-top: 4rem;
+      display: flex;
+      flex-direction: column;
+      transition: left 0.3s ease-in-out;
+      z-index: 999;
+    }
+
+    #sideMenu a {
+      color: #ddd;
+      text-decoration: none;
+      padding: 0.8rem 1rem;
+      display: block;
+      border-bottom: 1px solid #222;
+      transition: background 0.2s;
+    }
+
+    #sideMenu a:hover, #sideMenu a.active {
+      background: #7a00ff33;
+      color: #fff;
+    }
+
+    #logout {
+      margin-top: auto;
+      border-top: 1px solid #333;
+    }
+
+    #godTrigger {
+      position: fixed;
+      bottom: 10px;
+      right: 15px;
+      color: #7a00ff;
+      cursor: pointer;
+      font-size: 0.8rem;
+      opacity: 0.2;
+    }
+
+    #godTrigger:hover {
+      opacity: 1;
+      text-shadow: 0 0 6px #7a00ff;
+    }
+  </style>
+</head>
+<body>
+  <!-- Floating Side Menu -->
+  <nav id="sideMenu">
+    <a href="homepage.html">🏠 Home</a>
+    <a href="homefeed.html">📃 Feed</a>
+    <a href="Novels.html">📚 Novels</a>
+    <a href="coding.html">💻 Coding</a>
+    <a href="community.html">🌐 Community</a>
+    <a href="notifications.html">🔔 Notifications</a>
+    <a href="profile.html">👤 Profile</a>
+    <a href="support.html">🛠 Support</a>
+    <a href="admin_dashboard.html" class="active">⚙️ Admin</a>
+    <a id="logout" href="logout.html">🚪 Logout</a>
+  </nav>
+
+  <header>
+    <h1>Admin Dashboard</h1>
+    <p>Welcome back, <strong id="adminName">Vøid Pæragon</strong></p>
+  </header>
+
+  <main>
+    <nav class="subnav">
+      <button class="tabBtn active" data-target="usersSection">👥 Users</button>
+      <button class="tabBtn" data-target="moderatorsSection">🛡 Moderators</button>
+      <button class="tabBtn" data-target="novelsSection">📚 Novels</button>
+      <button class="tabBtn" data-target="codesSection">💻 Codes</button>
+      <button class="tabBtn" data-target="analyticsSection">📊 Analytics</button>
+    </nav>
+
+    <section id="dashboardContent">
+      <div id="usersSection" class="tabContent">
+        <h2>All Users</h2>
+        <div id="userList">Loading users...</div>
+      </div>
+
+      <div id="moderatorsSection" class="tabContent hidden">
+        <h2>Moderators</h2>
+        <div id="modList">Loading moderators...</div>
+      </div>
+
+      <div id="novelsSection" class="tabContent hidden">
+        <h2>All Novels</h2>
+        <div id="novelList">Loading novels...</div>
+      </div>
+
+      <div id="codesSection" class="tabContent hidden">
+        <h2>All Codes</h2>
+        <div id="codeList">Loading code projects...</div>
+      </div>
+
+      <div id="analyticsSection" class="tabContent hidden">
+        <h2>Website Analytics</h2>
+        <p>Total Users: <span id="userCount">0</span></p>
+        <p>Total Moderators: <span id="modCount">0</span></p>
+        <p>Total Novels: <span id="novelCount">0</span></p>
+      </div>
+    </section>
+  </main>
+
+  <span id="godTrigger">⚡</span>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getDatabase, ref, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5SkjADPqjkjEsmV_tUAk-KWNRFK59t_s",
+      authDomain: "void-paragon-site.firebaseapp.com",
+      databaseURL: "https://void-paragon-site-default-rtdb.firebaseio.com",
+      projectId: "void-paragon-site",
+      storageBucket: "void-paragon-site.firebasestorage.app",
+      messagingSenderId: "109588109735",
+      appId: "1:109588109735:web:611c31b37a4a1de5113e82"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+
+    const tabBtns = document.querySelectorAll(".tabBtn");
+    const sections = document.querySelectorAll(".tabContent");
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        tabBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        sections.forEach(s => s.classList.add("hidden"));
+        document.getElementById(btn.dataset.target).classList.remove("hidden");
+      });
+    });
+
+    // Authentication check
+    onAuthStateChanged(auth, (user) => {
+      if (!user || user.email !== "paragon3467@gmail.com") {
+        document.body.innerHTML = "<h2 style='text-align:center;margin-top:50px;color:#7a00ff;'>Access Denied. Admins Only.</h2>";
+        return;
+      }
+      loadDashboard();
+    });
+
+    function loadDashboard() {
+      const userList = document.getElementById("userList");
+      const modList = document.getElementById("modList");
+      const novelList = document.getElementById("novelList");
+      const codeList = document.getElementById("codeList");
+
+      onValue(ref(db, "users"), (snapshot) => {
+        userList.innerHTML = "";
+        let count = 0;
+        snapshot.forEach(child => {
+          count++;
+          const data = child.val();
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <h3>${child.key}</h3>
+            <p>${data.bio || "No bio"}</p>
+            <button onclick="deleteUser('${child.key}')">Delete</button>
+            <button onclick="makeModerator('${child.key}')">Promote to Mod</button>
+          `;
+          userList.appendChild(div);
+        });
+        document.getElementById("userCount").textContent = count;
+      });
+
+      onValue(ref(db, "moderators"), (snapshot) => {
+        modList.innerHTML = "";
+        let modCount = 0;
+        snapshot.forEach(child => {
+          modCount++;
+          const data = child.val();
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <h3>${child.key}</h3>
+            <p>${data.role || "Moderator"}</p>
+            <button onclick="removeModerator('${child.key}')">Remove Mod</button>
+          `;
+          modList.appendChild(div);
+        });
+        document.getElementById("modCount").textContent = modCount;
+      });
+
+      onValue(ref(db, "novels"), (snapshot) => {
+        novelList.innerHTML = "";
+        let novelCount = 0;
+        snapshot.forEach(child => {
+          novelCount++;
+          const data = child.val();
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <h3>${data.title}</h3>
+            <p>By: ${data.author}</p>
+            <button onclick="deleteNovel('${child.key}')">Delete</button>
+            <button onclick="togglePremium('${child.key}', ${data.premium || false})">${data.premium ? "Unlock" : "Lock"} Premium</button>
+          `;
+          novelList.appendChild(div);
+        });
+        document.getElementById("novelCount").textContent = novelCount;
+      });
+
+      onValue(ref(db, "codes"), (snapshot) => {
+        codeList.innerHTML = "";
+        snapshot.forEach(child => {
+          const data = child.val();
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <h3>${data.title}</h3>
+            <p>By: ${data.author}</p>
+            <button onclick="deleteCode('${child.key}')">Delete</button>
+          `;
+          codeList.appendChild(div);
+        });
+      });
+    }
+
+    // Admin Actions
+    window.deleteUser = (username) => {
+      if (confirm(`Delete user ${username}?`)) remove(ref(db, "users/" + username));
+    };
+
+    window.makeModerator = (username) => {
+      update(ref(db, "moderators/" + username), { role: "Moderator" });
+      alert(username + " promoted to Moderator.");
+    };
+
+    window.removeModerator = (username) => {
+      remove(ref(db, "moderators/" + username));
+      alert(username + " demoted.");
+    };
+
+    window.deleteNovel = (key) => {
+      if (confirm("Delete this novel?")) remove(ref(db, "novels/" + key));
+    };
+
+    window.togglePremium = (key, isPremium) => {
+      update(ref(db, "novels/" + key), { premium: !isPremium });
+      alert("Premium status changed.");
+    };
+
+    window.deleteCode = (key) => {
+      if (confirm("Delete this code project?")) remove(ref(db, "codes/" + key));
+    };
+
+    // Logout
+    document.getElementById("logout").addEventListener("click", (e) => {
+      e.preventDefault();
+      signOut(auth).then(() => {
+        localStorage.clear();
+        alert("Logged out.");
+        window.location.href = "index.html";
+      });
+    });
+
+    // Godmode shortcut
+    const godTrigger = document.getElementById("godTrigger");
+    godTrigger.addEventListener("dblclick", () => {
+      alert("Backup access enabled. Use /admin?key=voidgate");
+      localStorage.setItem("backup_access", "true");
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications • Vøid Pæragon</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+  <style>
+    body {
+      background-color: #000;
+      color: #eee;
+      font-family: "Poppins", sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      border-bottom: 1px solid #7a00ff;
+    }
+
+    header h1 {
+      color: #7a00ff;
+      font-family: "Cinzel", serif;
+    }
+
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+
+    .notification {
+      display: flex;
+      align-items: flex-start;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .notification:hover {
+      box-shadow: 0 0 12px rgba(122, 0, 255, 0.25);
+    }
+
+    .notification.read {
+      opacity: 0.6;
+    }
+
+    .icon {
+      font-size: 1.5rem;
+      margin-right: 1rem;
+    }
+
+    .content {
+      flex: 1;
+    }
+
+    .content h3 {
+      color: #9b59b6;
+      margin-bottom: 0.3rem;
+    }
+
+    .content p {
+      color: #ccc;
+      font-size: 0.9rem;
+    }
+
+    .time {
+      color: #777;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+    }
+
+    #markAll {
+      display: block;
+      margin: 1.5rem auto;
+      background: #7a00ff;
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    #markAll:hover {
+      opacity: 0.85;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      border-top: 1px solid #222;
+      color: #777;
+      margin-top: 2rem;
+    }
+
+    /* === Floating Side Menu === */
+    #sideMenu {
+      position: fixed;
+      top: 50%;
+      left: 1rem;
+      transform: translateY(-50%);
+      background: rgba(17, 17, 17, 0.95);
+      border: 1px solid #7a00ff;
+      border-radius: 12px;
+      padding: 1rem 0.8rem;
+      box-shadow: 0 0 15px rgba(122, 0, 255, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      z-index: 999;
+      text-align: center;
+    }
+
+    #sideMenu a {
+      color: #ccc;
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: 0.3s;
+    }
+
+    #sideMenu a:hover,
+    #sideMenu a.active {
+      color: #7a00ff;
+      text-shadow: 0 0 6px #7a00ff;
+    }
+
+    #sideMenu hr {
+      border: 0;
+      border-top: 1px solid #333;
+      margin: 0.8rem 0;
+    }
+
+    @media (max-width: 700px) {
+      #sideMenu {
+        flex-direction: row;
+        bottom: 0;
+        top: auto;
+        left: 0;
+        right: 0;
+        transform: none;
+        justify-content: space-around;
+        border-radius: 0;
+        border-top: 1px solid #7a00ff;
+        background: rgba(17, 17, 17, 0.98);
+      }
+      #sideMenu hr {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- === Floating Menu === -->
+  <nav id="sideMenu">
+    <a href="homepage.html">🏠 Home</a>
+    <a href="homefeed.html">📃 Feed</a>
+    <a href="Novels.html">📚 Novels</a>
+    <a href="coding.html">💻 Coding</a>
+    <a href="community.html">🌐 Community</a>
+    <a href="notifications.html" class="active">🔔 Notifications</a>
+    <a href="profile.html">👤 Profile</a>
+    <a href="support.html">🛠️ Support</a>
+    <hr>
+    <a href="#" id="logoutBtn">🚪 Log Out</a>
+  </nav>
+
+  <header>
+    <h1>Notifications</h1>
+    <p>Stay updated with your novels, messages, and system alerts.</p>
+  </header>
+
+  <main>
+    <div id="notificationsList">
+      <p>Loading notifications...</p>
+    </div>
+
+    <button id="markAll">Mark All as Read</button>
+  </main>
+
+  <footer>© 2025 Vøid Pæragon</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+    import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5SkjADPqjkjEsmV_tUAk-KWNRFK59t_s",
+      authDomain: "void-paragon-site.firebaseapp.com",
+      databaseURL: "https://void-paragon-site-default-rtdb.firebaseio.com",
+      projectId: "void-paragon-site",
+      storageBucket: "void-paragon-site.firebasestorage.app",
+      messagingSenderId: "109588109735",
+      appId: "1:109588109735:web:611c31b37a4a1de5113e82"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    const username = localStorage.getItem("vp_username") || "Guest_A004";
+
+    const notificationsList = document.getElementById("notificationsList");
+    const markAllBtn = document.getElementById("markAll");
+
+    function renderNotification(id, data) {
+      const div = document.createElement("div");
+      div.className = "notification" + (data.read ? " read" : "");
+      div.innerHTML = `
+        <div class="icon">${
+          data.type === "message" ? "💬" :
+          data.type === "update" ? "📘" :
+          data.type === "system" ? "⚙️" : "🔔"
+        }</div>
+        <div class="content">
+          <h3>${data.title || "Notification"}</h3>
+          <p>${data.text}</p>
+          <div class="time">${new Date(data.time).toLocaleString()}</div>
+        </div>
+      `;
+
+      div.addEventListener("click", () => {
+        if (!data.read) {
+          update(ref(db, "notifications/" + username + "/" + id), { read: true });
+          div.classList.add("read");
+        }
+      });
+
+      return div;
+    }
+
+    // Infinite Scroll Variables
+    let allNotifs = [];
+    let loadedCount = 0;
+    const loadStep = 10;
+
+    function loadMore() {
+      const toLoad = allNotifs.slice(loadedCount, loadedCount + loadStep);
+      toLoad.forEach(([id, data]) => {
+        notificationsList.appendChild(renderNotification(id, data));
+      });
+      loadedCount += loadStep;
+    }
+
+    window.addEventListener("scroll", () => {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+        loadMore();
+      }
+    });
+
+    onValue(ref(db, "notifications/" + username), (snapshot) => {
+      notificationsList.innerHTML = "";
+      if (!snapshot.exists()) {
+        notificationsList.innerHTML = "<p>No notifications yet.</p>";
+        return;
+      }
+
+      const notifs = Object.entries(snapshot.val()).sort((a, b) => new Date(b[1].time) - new Date(a[1].time));
+      allNotifs = notifs;
+      loadedCount = 0;
+      loadMore();
+    });
+
+    markAllBtn.addEventListener("click", () => {
+      onValue(ref(db, "notifications/" + username), (snapshot) => {
+        if (snapshot.exists()) {
+          Object.keys(snapshot.val()).forEach(id => {
+            update(ref(db, "notifications/" + username + "/" + id), { read: true });
+          });
+        }
+      }, { onlyOnce: true });
+      document.querySelectorAll(".notification").forEach(n => n.classList.add("read"));
+    });
+
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", (e) => {
+      e.preventDefault();
+      signOut(auth).then(() => {
+        localStorage.clear();
+        alert("Logged out successfully.");
+        window.location.href = "index.html";
+      });
+    });
+  </script>
+</body>
+</html>

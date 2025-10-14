@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Support • Vøid Pæragon</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <style>
+    body {
+      background: #000;
+      color: #eee;
+      font-family: "Poppins", sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      text-align: center;
+      padding: 2rem 1rem 1rem;
+      border-bottom: 1px solid #7a00ff;
+    }
+
+    header h1 {
+      color: #7a00ff;
+      font-family: "Cinzel", serif;
+    }
+
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+    }
+
+    section {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 10px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 15px rgba(122, 0, 255, 0.15);
+    }
+
+    h2 {
+      color: #9b59b6;
+      margin-bottom: 0.6rem;
+    }
+
+    a {
+      color: #7a00ff;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: #111;
+      color: #eee;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 0.6rem;
+      margin-top: 0.4rem;
+    }
+
+    button {
+      background: #7a00ff;
+      border: none;
+      color: #fff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 0.8rem;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      opacity: 0.85;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      border-top: 1px solid #222;
+      color: #777;
+      margin-top: 2rem;
+    }
+
+    /* === Floating Side Menu (Unified Layout) === */
+    #menuToggle {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      background: #7a00ff;
+      color: white;
+      border: none;
+      padding: 0.5rem 0.7rem;
+      border-radius: 6px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    #sideMenu {
+      position: fixed;
+      top: 0;
+      left: -220px;
+      height: 100%;
+      width: 200px;
+      background: rgba(15, 15, 15, 0.97);
+      border-right: 2px solid #7a00ff;
+      padding-top: 4rem;
+      display: flex;
+      flex-direction: column;
+      transition: left 0.3s ease-in-out;
+      z-index: 999;
+    }
+
+    #sideMenu.active {
+      left: 0;
+    }
+
+    #sideMenu a {
+      color: #ddd;
+      text-decoration: none;
+      padding: 0.8rem 1rem;
+      display: block;
+      border-bottom: 1px solid #222;
+      transition: background 0.2s;
+    }
+
+    #sideMenu a:hover,
+    #sideMenu a.active {
+      background: #7a00ff33;
+    }
+
+    #logout {
+      margin-top: auto;
+      border-top: 1px solid #333;
+    }
+
+    /* Google Pay button */
+    #gpay-button {
+      display: flex;
+      justify-content: center;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Floating Menu Button -->
+  <button id="menuToggle">☰</button>
+
+  <!-- Side Menu (same as all pages) -->
+  <nav id="sideMenu">
+    <a href="homepage.html">🏠 Home</a>
+    <a href="homefeed.html">📃 Feed</a>
+    <a href="Novels.html">📚 Novels</a>
+    <a href="coding.html">💻 Coding</a>
+    <a href="community.html">🌍 Community</a>
+    <a href="notifications.html" class="active">🔔 Notifications</a>
+    <a href="profile.html">👤 Profile</a>
+    <a href="support.html" class="active">🛠 Support</a>
+    <a id="logout" href="logout.html">🚪 Logout</a>
+  </nav>
+
+  <header>
+    <h1>Support Center</h1>
+    <p>Need help? Reach the Vøid Paragon team directly.</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Customer Service</h2>
+      <p>📧 Email us at: <a href="mailto:paragongroups3@gmail.com">paragongroups3@gmail.com</a></p>
+      <p>Response Time: within 24–48 hours</p>
+    </section>
+
+    <section>
+      <h2>Helpful Links</h2>
+      <ul>
+        <li><a href="faq.html">Frequently Asked Questions</a></li>
+        <li><a href="terms.html">Terms & Policies</a></li>
+        <li><a href="privacy.html">Privacy & Data</a></li>
+        <li><a href="report.html">Report an Issue</a></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Support Accounts</h2>
+      <ul>
+        <li>Discord: <a href="#">(add link)</a></li>
+        <li>PayPal: <a href="#">(add link)</a></li>
+        <li>Twitter: <a href="#">(add link)</a></li>
+        <li>Reddit: <a href="#">(add link)</a></li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Send a Direct Message</h2>
+      <p>This will send your message straight to admin.</p>
+      <input type="text" id="subject" placeholder="Subject" />
+      <textarea id="message" rows="4" placeholder="Type your message..."></textarea>
+      <button id="sendBtn">Send Message</button>
+    </section>
+
+    <section>
+      <h2>Support the Project</h2>
+      <p>Want to support Vøid Pæragon? Use Google Pay below:</p>
+      <div id="gpay-button"></div>
+    </section>
+  </main>
+
+  <footer>© 2025 Vøid Pæragon</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5SkjADPqjkjEsmV_tUAk-KWNRFK59t_s",
+      authDomain: "void-paragon-site.firebaseapp.com",
+      databaseURL: "https://void-paragon-site-default-rtdb.firebaseio.com",
+      projectId: "void-paragon-site",
+      storageBucket: "void-paragon-site.firebasestorage.app",
+      messagingSenderId: "109588109735",
+      appId: "1:109588109735:web:611c31b37a4a1de5113e82"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const username = localStorage.getItem("vp_username") || "Guest_A004";
+    const sendBtn = document.getElementById("sendBtn");
+    const subject = document.getElementById("subject");
+    const message = document.getElementById("message");
+
+    sendBtn.addEventListener("click", () => {
+      const subj = subject.value.trim();
+      const msg = message.value.trim();
+
+      if (!subj || !msg) return alert("Please fill in both subject and message.");
+
+      push(ref(db, "support_messages"), {
+        from: username,
+        subject: subj,
+        message: msg,
+        time: new Date().toISOString()
+      });
+
+      alert("Your message has been sent successfully!");
+      subject.value = "";
+      message.value = "";
+    });
+
+    // === Google Pay Setup (client-side preview) ===
+    const paymentsClient = new google.payments.api.PaymentsClient({ environment: 'TEST' });
+
+    const paymentRequest = {
+      apiVersion: 2,
+      apiVersionMinor: 0,
+      allowedPaymentMethods: [{
+        type: 'CARD',
+        parameters: {
+          allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+          allowedCardNetworks: ['MASTERCARD', 'VISA']
+        },
+        tokenizationSpecification: {
+          type: 'PAYMENT_GATEWAY',
+          parameters: {
+            'gateway': 'example', // Replace with real gateway (Stripe, Razorpay, etc.)
+            'gatewayMerchantId': 'exampleMerchantId'
+          }
+        }
+      }],
+      merchantInfo: {
+        merchantId: 'BCR2DN6T4PS4Z6B2', // replace with your merchant ID later
+        merchantName: 'Vøid Pæragon'
+      },
+      transactionInfo: {
+        totalPriceStatus: 'FINAL',
+        totalPriceLabel: 'Total',
+        totalPrice: '1.00',
+        currencyCode: 'USD',
+        countryCode: 'US'
+      }
+    };
+
+    const button = paymentsClient.createButton({
+      onClick: () => {
+        paymentsClient.loadPaymentData(paymentRequest).then(paymentData => {
+          console.log("Payment success:", paymentData);
+          alert("Payment successful!");
+        }).catch(err => {
+          console.error("Payment failed:", err);
+          alert("Payment cancelled or failed.");
+        });
+      }
+    });
+
+    document.getElementById("gpay-button").appendChild(button);
+
+    // Menu toggle
+    const menuBtn = document.getElementById("menuToggle");
+    const menu = document.getElementById("sideMenu");
+    menuBtn.addEventListener("click", () => {
+      menu.classList.toggle("active");
+    });
+  </script>
+
+  <!-- Google Pay SDK -->
+  <script async src="https://pay.google.com/gp/p/js/pay.js"></script>
+</body>
+</html>

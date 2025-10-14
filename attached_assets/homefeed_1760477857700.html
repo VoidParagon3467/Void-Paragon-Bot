@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vøid Pæragon — Feed</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent:#7a00ff;
+      --bg:#000;
+      --text:#eee;
+    }
+    *{box-sizing:border-box;}
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      transition: background .3s, color .3s;
+    }
+
+    header {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 60px;
+      background: #111;
+      border-bottom: 2px solid var(--accent);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 1rem;
+      z-index: 1000;
+    }
+    header h1 { color: var(--accent); font-family: "Cinzel", serif; font-size: 1.2rem; }
+    #userName { color: var(--accent); font-weight: 600; cursor:pointer; }
+
+    /* SIDE MENU (same across all pages) */
+    #sideMenu {
+      position: fixed;
+      top: 0; left: -260px;
+      width: 240px; height: 100%;
+      background: #111;
+      border-right: 2px solid var(--accent);
+      transition: left .3s ease;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    #sideMenu.active { left: 0; }
+    #menuBtn { font-size: 1.8rem; cursor: pointer; color: var(--accent); }
+    #menuProfile {
+      text-align: center;
+      padding-top: 70px;
+    }
+    #menuProfile img {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+    }
+    #menuProfile h3 { margin: .5rem 0; color: var(--accent); font-family: "Cinzel", serif; }
+    #menuLinks a {
+      display: block;
+      color: var(--text);
+      text-decoration: none;
+      padding: .8rem 1rem;
+      border-bottom: 1px solid #222;
+      transition: .3s;
+    }
+    #menuLinks a:hover { background: var(--accent); color: #fff; }
+    #logout {
+      display: block;
+      color: #fff;
+      text-decoration: none;
+      background: var(--accent);
+      text-align: center;
+      padding: .9rem;
+      font-weight: 600;
+    }
+
+    /* FEED CONTENT */
+    main {
+      padding: 5rem 1rem 2rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #111;
+      border: 1px solid #222;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(122,0,255,0.15);
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { color: var(--accent); margin-bottom: .3rem; }
+    .card p { color: #ccc; font-size: 0.95rem; }
+    .actions { display: flex; justify-content: space-between; margin-top: 1rem; }
+    .actions button {
+      background-color: var(--accent);
+      border: none;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .actions button:hover { opacity: 0.8; }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      border-top: 1px solid #222;
+      color: #777;
+    }
+
+    /* LIGHT MODE */
+    body.light {
+      --bg:#fff;
+      --text:#111;
+    }
+    body.light header, body.light #sideMenu { background:#f5f5f5; }
+    #themeToggle {
+      background:none;
+      border:none;
+      color:var(--accent);
+      font-size:1.3rem;
+      cursor:pointer;
+    }
+
+    @media (max-width:600px){
+      .actions{flex-direction:column;gap:.5rem;}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div id="menuBtn">☰</div>
+    <h1>Vøid Feed</h1>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <span id="userName">Guest_A004</span>
+      <button id="themeToggle">🌙</button>
+    </div>
+  </header>
+
+  <!-- SIDE MENU -->
+  <nav id="sideMenu">
+    <div>
+      <div id="menuProfile">
+        <img src="https://i.ibb.co/rGsK70vJ/file-000000006cd8620d81ac8a03bfac11c8.jpg" alt="Profile">
+        <h3>Vøid Pæragon</h3>
+      </div>
+      <div id="menuLinks">
+        <a href="homepage.html">🏠 Home</a>
+        <a href="homefeed.html">📃 Feed</a>
+        <a href="Novels.html">📚 Novels</a>
+        <a href="coding.html">💻 Coding</a>
+        <a href="community.html">🌐 Community</a>
+        <a href="notifications.html" class="active">🔔 Notifications</a>
+        <a href="profile.html">👤 Profile</a>
+        <a href="support.html">💬 Support</a>
+      </div>
+    </div>
+    <a href="#" id="logout">🚪 Log Out</a>
+  </nav>
+
+  <!-- FEED -->
+  <main id="feed">
+    <!-- Auto populated from Firebase -->
+  </main>
+
+  <footer>© 2025 Vøid Pæragon</footer>
+
+  <!-- FIREBASE -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5SkjADPqjkjEsmV_tUAk-KWNRFK59t_s",
+      authDomain: "void-paragon-site.firebaseapp.com",
+      databaseURL: "https://void-paragon-site-default-rtdb.firebaseio.com",
+      projectId: "void-paragon-site",
+      storageBucket: "void-paragon-site.firebasestorage.app",
+      messagingSenderId: "109588109735",
+      appId: "1:109588109735:web:611c31b37a4a1de5113e82"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const feed = document.getElementById("feed");
+
+    function renderCard(id, data) {
+      const card = document.createElement("div");
+      card.classList.add("card");
+      card.innerHTML = `
+        <h2>${data.title}</h2>
+        <p><strong>Author:</strong> ${data.author}</p>
+        <p>${data.summary}</p>
+        <div class="actions">
+          <button onclick="likePost('${id}')">❤️ ${data.likes || 0}</button>
+          <button onclick="commentPost('${id}')">💬 ${data.comments ? Object.keys(data.comments).length : 0}</button>
+          <button onclick="readPost('${id}')">📖 Continue Reading</button>
+        </div>`;
+      feed.appendChild(card);
+    }
+
+    onValue(ref(db, "novels/"), (snapshot) => {
+      feed.innerHTML = "";
+      if (!snapshot.exists()) {
+        feed.innerHTML = "<p>No novels found yet. The Void awaits creation.</p>";
+        return;
+      }
+      const data = snapshot.val();
+      Object.keys(data).forEach(id => renderCard(id, data[id]));
+    });
+
+    window.likePost = function (id) {
+      const postRef = ref(db, "novels/" + id + "/likes");
+      onValue(postRef, (snapshot) => {
+        let likes = snapshot.val() || 0;
+        update(ref(db, "novels/" + id), { likes: likes + 1 });
+      }, { onlyOnce: true });
+    };
+
+    window.commentPost = function (id) {
+      const comment = prompt("Enter your comment:");
+      if (!comment) return;
+      const commentsRef = ref(db, "novels/" + id + "/comments");
+      const newComment = {
+        user: "Guest_A004",
+        text: comment,
+        time: new Date().toISOString()
+      };
+      update(commentsRef, newComment);
+    };
+
+    window.readPost = function (id) {
+      alert("Loading full novel...");
+    };
+  </script>
+
+  <script>
+    // Menu toggle and theme sync
+    const menuBtn=document.getElementById("menuBtn");
+    const sideMenu=document.getElementById("sideMenu");
+    const themeToggle=document.getElementById("themeToggle");
+    const userName=document.getElementById("userName");
+
+    menuBtn.onclick=()=>sideMenu.classList.toggle("active");
+
+    themeToggle.onclick=()=>{
+      document.body.classList.toggle("light");
+      const mode=document.body.classList.contains("light")?"light":"dark";
+      localStorage.setItem("vp_theme",mode);
+      themeToggle.textContent=mode==="light"?"🌙":"☀️";
+    };
+
+    const saved=localStorage.getItem("vp_theme");
+    if(saved==="light"){document.body.classList.add("light");themeToggle.textContent="🌙";}
+
+    userName.onclick=()=>window.location.href="profile.html";
+  </script>
+</body>
+</html>

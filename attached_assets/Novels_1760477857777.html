@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novels | Vøid Pæragon</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent:#7a00ff;
+      --bg:#000;
+      --text:#e0e0e0;
+    }
+    body {background:var(--bg);color:var(--text);font-family:"Inter",sans-serif;margin:0;transition:background .3s,color .3s;}
+    header {position:fixed;top:0;left:0;width:100%;background:#0a0a0a;border-bottom:2px solid var(--accent);
+      display:flex;justify-content:space-between;align-items:center;padding:0.6rem 1rem;z-index:1000;}
+    #menuBtn{font-size:1.8rem;color:var(--accent);cursor:pointer;}
+    #userName{color:var(--accent);font-weight:600;}
+    #themeToggle{background:none;border:none;color:var(--accent);font-size:1.3rem;cursor:pointer;}
+    #sideMenu{position:fixed;top:0;left:-240px;width:220px;height:100%;background:#111;border-right:2px solid var(--accent);
+      display:flex;flex-direction:column;justify-content:space-between;transition:left .3s;z-index:999;}
+    #sideMenu.active{left:0;}
+    #menuProfile{text-align:center;padding-top:70px;}
+    #menuProfile img{width:80px;height:80px;border-radius:50%;border:2px solid var(--accent);}
+    #menuProfile h3{color:var(--accent);font-family:"Cinzel",serif;}
+    #menuLinks a{display:block;color:var(--text);text-decoration:none;padding:.8rem 1rem;border-bottom:1px solid #222;transition:.3s;}
+    #menuLinks a:hover{background:var(--accent);color:#fff;}
+    #logout{background:#7a00ff;text-align:center;padding:0.9rem;color:#fff;text-decoration:none;}
+    main{padding:5rem 1rem 2rem;max-width:1000px;margin:auto;}
+    h1{text-align:center;color:var(--accent);font-family:"Cinzel",serif;margin-bottom:1rem;}
+    .tabs{display:flex;justify-content:center;gap:1rem;margin-bottom:1.5rem;}
+    .tab{background:#111;border:1px solid var(--accent);color:#eee;padding:.6rem 1.2rem;border-radius:6px;cursor:pointer;transition:.3s;}
+    .tab.active,.tab:hover{background:var(--accent);color:#fff;}
+    .novel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;}
+    .novel-card{background:#111;border:1px solid #333;border-radius:8px;padding:1rem;text-align:center;}
+    .novel-card img{width:100%;height:260px;object-fit:cover;border-radius:6px;border:1px solid var(--accent);}
+    .novel-card h3{color:var(--accent);margin:.5rem 0;}
+    .novel-card button{background:var(--accent);border:none;color:#fff;padding:.4rem .8rem;border-radius:4px;cursor:pointer;margin-top:.5rem;}
+    .centered{text-align:center;padding:4rem 1rem;color:#aaa;}
+    .centered button{background:var(--accent);color:#fff;border:none;padding:1rem 2rem;border-radius:8px;font-size:1.1rem;cursor:pointer;}
+    #writeForm input,#writeForm textarea,#writeForm select{width:100%;padding:.6rem;margin:.4rem 0;background:#111;color:#fff;border:1px solid var(--accent);border-radius:6px;}
+    #writeForm button{background:var(--accent);border:none;color:#fff;padding:.6rem 1rem;border-radius:6px;margin-top:.5rem;cursor:pointer;}
+    #editorArea{display:none;background:#0a0a0a;padding:1rem;border-radius:6px;margin-top:1rem;}
+    #editorArea textarea{width:100%;height:450px;background:#111;color:#fff;border:1px solid var(--accent);padding:1rem;font-size:1rem;border-radius:6px;}
+    .editor-tools{display:flex;justify-content:space-between;margin-bottom:.5rem;}
+    #readerView{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:#000;color:#fff;overflow:auto;z-index:2000;padding:1rem;}
+    #readerView h2{color:var(--accent);}
+    #readerBack{font-size:1.5rem;color:var(--accent);cursor:pointer;position:fixed;top:1rem;left:1rem;}
+    .commentBox textarea{width:100%;background:#111;color:#fff;border:1px solid var(--accent);padding:.5rem;border-radius:6px;}
+    .commentBox button{background:var(--accent);color:#fff;border:none;padding:.5rem 1rem;margin-top:.4rem;border-radius:6px;cursor:pointer;}
+    footer{text-align:center;padding:1rem;color:#666;margin-top:2rem;}
+  </style>
+</head>
+
+<body>
+  <header>
+    <div id="menuBtn">☰</div>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <span id="userName">Guest_A004</span>
+      <button id="themeToggle">🌙</button>
+    </div>
+  </header>
+
+  <nav id="sideMenu">
+    <div>
+      <div id="menuProfile">
+        <img src="https://i.ibb.co/rGsK70vJ/file-000000006cd8620d81ac8a03bfac11c8.jpg">
+        <h3>Vøid Pæragon</h3>
+      </div>
+      <div id="menuLinks">
+        <a href="homepage.html">🏠 Home</a>
+        <a href="homefeed.html">📃 Feed</a>
+        <a href="Novels.html">📚 Novels</a>
+        <a href="coding.html">💻 Coding</a>
+        <a href="community.html">🌐 Community</a>
+        <a href="notifications.html">🔔 Notifications</a>
+        <a href="profile.html">👤 Profile</a>
+        <a href="support.html">💬 Support</a>
+      </div>
+    </div>
+    <a href="#" id="logout">🚪 Log Out</a>
+  </nav>
+
+  <main>
+    <h1>Void Novels</h1>
+    <div class="tabs">
+      <div class="tab active" id="tabLibrary">💾 Library</div>
+      <div class="tab" id="tabWrite">✍️ Write</div>
+    </div>
+
+    <section id="library">
+      <div id="libraryGrid" class="novel-grid"></div>
+    </section>
+
+    <section id="write">
+      <div id="writeList" class="centered">
+        <h2>Start Your Journey</h2>
+        <p>Write, edit, and publish immersive novels like Wattpad.</p>
+        <button id="createNew">➕ Create New Novel</button>
+      </div>
+
+      <form id="writeForm" style="display:none;">
+        <h2>Novel Details</h2>
+        <input id="cover" placeholder="Cover Image URL">
+        <input id="title" placeholder="Novel Title" required>
+        <textarea id="synopsis" placeholder="Synopsis"></textarea>
+        <input id="tags" placeholder="Tags (comma separated)">
+        <select id="genre">
+          <option>Fantasy</option><option>Romance</option><option>Adventure</option>
+          <option>Mystery</option><option>Sci-Fi</option><option>Action</option><option>Drama</option>
+        </select>
+        <label><input type="checkbox" id="mature"> Mature</label><br>
+        <select id="status"><option>Ongoing</option><option>Completed</option></select>
+        <textarea id="copyright" placeholder="Copyright © 2025 Vøid Pæragon"></textarea>
+        <button type="button" id="saveDetails">💾 Save Details</button>
+      </form>
+
+      <div id="editorArea">
+        <div class="editor-tools">
+          <div><button id="previewBtn">👁 Preview</button><button id="saveDraftBtn">💾 Save Draft</button><button id="publishBtn">📖 Publish</button></div>
+          <div id="wordCount">Words: 0</div>
+        </div>
+        <input id="chapterTitle" placeholder="Chapter Title" />
+        <input id="chapterDedication" placeholder="Dedication (optional)" />
+        <textarea id="chapterText" placeholder="Start writing..."></textarea>
+      </div>
+    </section>
+  </main>
+
+  <div id="readerView">
+    <div id="readerBack">⬅</div>
+    <div id="readerContent"></div>
+    <div class="commentBox">
+      <textarea id="readerComment" placeholder="Leave a comment..."></textarea>
+      <button id="sendComment">💬 Comment</button>
+    </div>
+  </div>
+
+  <footer>© 2025 Vøid Pæragon</footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    import { getDatabase, ref, set, get, onValue, update, push } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey:"AIzaSyD5SkjADPqjkjEsmV_tUAk-KWNRFK59t_s",
+      authDomain:"void-paragon-site.firebaseapp.com",
+      databaseURL:"https://void-paragon-site-default-rtdb.firebaseio.com",
+      projectId:"void-paragon-site",
+      storageBucket:"void-paragon-site.firebasestorage.app",
+      messagingSenderId:"109588109735",
+      appId:"1:109588109735:web:611c31b37a4a1de5113e82"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const username = localStorage.getItem("vp_username") || "guest_A004";
+    document.getElementById("userName").textContent = username;
+
+    const libraryGrid = document.getElementById("libraryGrid");
+    const createNew = document.getElementById("createNew");
+    const writeList = document.getElementById("writeList");
+    const writeForm = document.getElementById("writeForm");
+    const editorArea = document.getElementById("editorArea");
+    const chapterText = document.getElementById("chapterText");
+    const wordCount = document.getElementById("wordCount");
+    const readerView = document.getElementById("readerView");
+    const readerContent = document.getElementById("readerContent");
+    const readerBack = document.getElementById("readerBack");
+
+    let currentNovelId=null;
+
+    onValue(ref(db,"novels/"),snap=>{
+      libraryGrid.innerHTML="";
+      if(!snap.exists())return libraryGrid.innerHTML="<p>No novels yet.</p>";
+      const novels=snap.val();
+      for(let id in novels){
+        const n=novels[id];
+        if(n.status==="published"){
+          const div=document.createElement("div");
+          div.className="novel-card";
+          div.innerHTML=`<img src="${n.cover||""}"><h3>${n.title}</h3><button>Read</button>`;
+          div.querySelector("button").onclick=()=>openReader(id);
+          libraryGrid.appendChild(div);
+        }
+      }
+    });
+
+    function openReader(id){
+      get(ref(db,"novels/"+id)).then(snap=>{
+        if(!snap.exists())return;
+        const n=snap.val();
+        readerView.style.display="block";
+        readerContent.innerHTML=`<h2>${n.title}</h2><p>${n.synopsis}</p>`;
+        if(n.chapters){
+          Object.values(n.chapters).forEach(c=>{
+            readerContent.innerHTML+=`<h3>${c.title||"Chapter"}</h3><em>${c.dedication||""}</em><p>${c.text}</p>`;
+          });
+        }
+        readerBack.onclick=()=>readerView.style.display="none";
+      });
+    }
+
+    createNew.onclick=()=>{writeList.style.display="none";writeForm.style.display="block";};
+
+    document.getElementById("saveDetails").onclick=()=>{
+      const novelId=Date.now().toString();
+      const data={
+        title:title.value,synopsis:synopsis.value,genre:genre.value,tags:tags.value,cover:cover.value,
+        mature:mature.checked,status:"draft",copyright:copyright.value,author:username
+      };
+      set(ref(db,"novels/"+novelId),data).then(()=>{alert("Saved!");writeForm.style.display="none";editorArea.style.display="block";currentNovelId=novelId;});
+    };
+
+    chapterText.addEventListener("input",()=>{wordCount.textContent="Words: "+chapterText.value.trim().split(/\s+/).filter(Boolean).length;});
+
+    document.getElementById("saveDraftBtn").onclick=()=>{
+      if(!currentNovelId)return;
+      const ch={title:chapterTitle.value,dedication:chapterDedication.value,text:chapterText.value,created:Date.now()};
+      push(ref(db,"novels/"+currentNovelId+"/chapters"),ch).then(()=>alert("Chapter saved!"));
+    };
+
+    document.getElementById("publishBtn").onclick=()=>{
+      if(!currentNovelId)return;
+      update(ref(db,"novels/"+currentNovelId),{status:"published"}).then(()=>alert("Published!"));
+    };
+
+  </script>
+
+  <script>
+    const tabs={library:document.getElementById("library"),write:document.getElementById("write")};
+    const buttons={library:document.getElementById("tabLibrary"),write:document.getElementById("tabWrite")};
+    for(let k in buttons){
+      buttons[k].addEventListener("click",()=>{
+        for(let x in tabs){tabs[x].style.display="none";buttons[x].classList.remove("active");}
+        tabs[k].style.display="block";buttons[k].classList.add("active");
+      });
+    }
+    const menuBtn=document.getElementById("menuBtn");
+    const sideMenu=document.getElementById("sideMenu");
+    menuBtn.onclick=()=>sideMenu.classList.toggle("active");
+  </script>
+</body>
+</html>
