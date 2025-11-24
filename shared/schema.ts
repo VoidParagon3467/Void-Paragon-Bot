@@ -832,8 +832,8 @@ export const insertServerSettingsSchema = createInsertSchema(serverSettings).omi
   updatedAt: true,
 });
 
-export const insertClanProgressionSchema = createInsertSchema(clanProgression).omit({ id: true, createdAt: true, updatedAt: true, lastXpGainAt: true });
-export const insertFactionProgressionSchema = createInsertSchema(factionProgression).omit({ id: true, createdAt: true, updatedAt: true, lastXpGainAt: true });
+export const insertClanProgressionSchema = createInsertSchema(clanProgression).omit({ id: true, lastXpGainAt: true, updatedAt: true });
+export const insertFactionProgressionSchema = createInsertSchema(factionProgression).omit({ id: true, lastXpGainAt: true, updatedAt: true });
 export const insertDungeonSchema = createInsertSchema(dungeons).omit({ id: true, createdAt: true });
 export const insertRaidSchema = createInsertSchema(raids).omit({ id: true, createdAt: true });
 export const insertArtifactSchema = createInsertSchema(artifacts).omit({ id: true });
@@ -892,3 +892,10 @@ export type Npc = typeof npcs.$inferSelect;
 export type QuestChain = typeof questChains.$inferSelect;
 export type Prestige = typeof prestige.$inferSelect;
 export type MarketListing = typeof marketListings.$inferSelect;
+export type DivineBody = typeof divineBodies.$inferSelect;
+export type Dao = typeof daos.$inferSelect;
+export type Title = typeof titles.$inferSelect;
+export type Weapon = typeof weapons.$inferSelect;
+export type BreakthroughTreasure = typeof breakthroughTreasures.$inferSelect;
+export type Event = typeof events.$inferSelect;
+export type EventParticipant = typeof eventParticipants.$inferSelect;

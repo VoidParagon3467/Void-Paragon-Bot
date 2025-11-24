@@ -141,7 +141,7 @@ export class CultivationBot {
       if (message.author.bot) return;
       
       // Handle DM conversations with the bot
-      if (message.isDMChannel()) {
+      if (message.channel.isDMBased()) {
         await this.handleDMConversation(message);
         return;
       }
@@ -153,7 +153,7 @@ export class CultivationBot {
           author: message.author.tag,
           authorId: message.author.id,
           content: message.content,
-          mentions: message.mentions.map(u => u.tag),
+          mentions: Array.from(message.mentions.users.values()).map((u: any) => u.tag),
         });
       }
       // Check for rule violations (moderation)
