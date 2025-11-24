@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   // Premium
   isPremium: boolean("is_premium").notNull().default(false),
   premiumExpiresAt: timestamp("premium_expires_at"),
+  // Admin roles
+  isSupremeSectMaster: boolean("is_supreme_sect_master").notNull().default(false),
   // Rebirth
   rebirthCount: integer("rebirth_count").notNull().default(0),
   // Meta

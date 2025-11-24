@@ -84,12 +84,20 @@ export class CultivationBot {
       for (const [serverId] of guilds) {
         const users = await storage.getUsersInServer(serverId);
 
-        for (const user of users) {
-          const resourcesPerLevel = 50 * user.level;
-          await storage.updateUser(user.id, {
-            voidCrystals: user.voidCrystals + resourcesPerLevel,
-            spiritPoints: user.spiritPoints + resourcesPerLevel * 0.5,
-            karma: user.karma + 10,
+        for (const userRecord of users) {
+          // Skip supreme sect master - they already have infinite
+          if (userRecord.isSupremeSectMaster) continue;
+          
+          const voidCrystalsReward = 50 * userRecord.level;
+          // Spirit Points VERY RARE - only 10% of void crystals (kept sparse)
+          const spiritPointsReward = Math.floor(voidCrystalsReward * 0.1);
+          // Karma EXCEEDINGLY RARE - only 1-3 max per day
+          const karmaReward = Math.floor(Math.random() * 3) + 1;
+          
+          await storage.updateUser(userRecord.id, {
+            voidCrystals: userRecord.voidCrystals + voidCrystalsReward,
+            spiritPoints: userRecord.spiritPoints + spiritPointsReward,
+            karma: userRecord.karma + karmaReward,
           } as any);
         }
 
@@ -103,8 +111,8 @@ export class CultivationBot {
               .setDescription(`All cultivators have received their daily resources!`)
               .setColor(0x00ff88)
               .addFields({
-                name: "Rewards",
-                value: `💎 50 × Level Void Crystals\n✨ 25 × Level Spirit Points\n⭐ 10 Karma`,
+                name: "Rewards (Per Player)",
+                value: `💎 50 × Level Void Crystals\n✨ 5 × Level Spirit Points (Very Rare)\n⭐ 1-3 Karma (Exceedingly Rare)`,
               })
               .setTimestamp();
 
@@ -312,23 +320,28 @@ export class CultivationBot {
 
             await (textChannel as any).send({ embeds: [embed] }).catch(console.error);
 
-            // Apply rewards
-            const users = await storage.getUsersInServer(serverId);
-            for (const user of users) {
+            // Apply rewards - respecting strict currency scarcity
+            const eventUsers = await storage.getUsersInServer(serverId);
+            for (const eventUser of eventUsers) {
+              if (eventUser.isSupremeSectMaster) continue; // Skip supreme sect master
+              
               let updates: any = {};
               switch (randomEvent.reward) {
                 case "double_crystals":
-                  updates.voidCrystals = user.voidCrystals + 500;
+                  // Void Crystals are most common
+                  updates.voidCrystals = eventUser.voidCrystals + (50 * eventUser.level);
                   break;
                 case "spirit_points":
-                  updates.spiritPoints = user.spiritPoints + 1000;
+                  // Spirit Points VERY RARE - 50-100 MAX
+                  updates.spiritPoints = eventUser.spiritPoints + (Math.floor(Math.random() * 50) + 50);
                   break;
                 case "karma":
-                  updates.karma = user.karma + 100;
+                  // Karma EXCEEDINGLY RARE - 5-10 MAX
+                  updates.karma = eventUser.karma + (Math.floor(Math.random() * 5) + 5);
                   break;
               }
               if (Object.keys(updates).length > 0) {
-                await storage.updateUser(user.id, updates);
+                await storage.updateUser(eventUser.id, updates);
               }
             }
           }
@@ -677,11 +690,25 @@ export class CultivationBot {
 
       const xpGain = Math.floor(Math.random() * 10) + 5;
       const newXp = user.xp + xpGain;
-      const xpToNextLevel = 100 * user.level;
+      // Exponential XP requirements: 100 * level^2
+      const xpToNextLevel = 100 * (user.level ** 2);
 
       if (newXp >= xpToNextLevel) {
+        // Check if can breakthrough to next realm at level 9
+        let realmIndex = cultivationRealms.indexOf(user.realm as any);
+        let newRealm = user.realm;
+        let newLevel = user.level + 1;
+        
+        if (newLevel > 9 && realmIndex < cultivationRealms.length - 1) {
+          newRealm = cultivationRealms[realmIndex + 1];
+          newLevel = 1;
+        } else if (newLevel > 9) {
+          newLevel = 9; // Cap at max level
+        }
+
         await storage.updateUser(user.id, {
-          level: user.level + 1,
+          level: newLevel,
+          realm: newRealm,
           xp: newXp - xpToNextLevel,
         } as any);
       } else {
@@ -777,12 +804,36 @@ export class CultivationBot {
         interaction.guild.id
       );
       if (!user) {
+        const isSupremeSectMaster = interaction.user.id === "1344237246240391272";
         user = await storage.createUser({
           discordId: interaction.user.id,
           username: interaction.user.username,
           avatar: interaction.user.displayAvatarURL(),
           serverId: interaction.guild.id,
+          isSupremeSectMaster,
+          // Grant infinite resources to supreme sect master
+          ...(isSupremeSectMaster && {
+            realm: "True God Realm",
+            level: 9,
+            xp: 999999,
+            voidCrystals: 999999999,
+            spiritPoints: 999999,
+            karma: 999999,
+            fate: 999999,
+          }),
         } as any);
+      } else if (user.discordId === "1344237246240391272" && !user.isSupremeSectMaster) {
+        // Update existing user to supreme sect master status
+        user = (await storage.updateUser(user.id, {
+          isSupremeSectMaster: true,
+          realm: "True God Realm",
+          level: 9,
+          xp: 999999,
+          voidCrystals: 999999999,
+          spiritPoints: 999999,
+          karma: 999999,
+          fate: 999999,
+        } as any)) as any;
       }
       return user;
     } catch (error) {
@@ -1713,8 +1764,10 @@ export class CultivationBot {
   }
 
   private async handleAdminCommand(interaction: any) {
-    // Check if user has admin permissions
+    const user = await this.getOrCreateUser(interaction);
+    // Check if user has admin permissions OR is supreme sect master
     if (
+      !user.isSupremeSectMaster &&
       !interaction.memberPermissions.has(
         PermissionFlagsBits.Administrator
       )
