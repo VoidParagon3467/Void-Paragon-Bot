@@ -2,13 +2,40 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Sword, Users, Zap, Crown, TrendingUp, Award, Flame, Gem } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { 
+  Crown, Zap, Users, Shield, Flame, Gem, Award, TrendingUp, 
+  Settings, Eye, Lock, Unlock, ChevronRight, AlertCircle 
+} from "lucide-react";
 import { Link } from "wouter";
 
 const MOCK_USER = {
   discordId: "123456789",
   serverId: "987654321"
 };
+
+const rankHierarchy = {
+  "Supreme Sect Master": { level: 15, multiplier: 100, permissions: ["all"] },
+  "Heavenly Elder": { level: 14, multiplier: 8, permissions: ["events", "moderation", "shop", "treasury"] },
+  "Great Elder": { level: 13, multiplier: 6, permissions: ["events", "moderation", "treasury"] },
+  "Elder": { level: 12, multiplier: 4, permissions: ["moderation", "treasury"] },
+  "Core Disciple": { level: 11, multiplier: 3, permissions: ["treasury"] },
+  "Inheritor Disciple": { level: 9, multiplier: 1.5, permissions: ["spar", "clan"] },
+  "Guardian": { level: 10, multiplier: 2, permissions: ["treasury"] },
+  "Inner Disciple": { level: 10, multiplier: 2, permissions: ["spar"] },
+  "Outer Disciple": { level: 1, multiplier: 1, permissions: ["spar"] },
+};
+
+const rankProgression = [
+  "Outer Disciple",
+  "Inner Disciple",
+  "Inheritor Disciple",
+  "Core Disciple",
+  "Elder",
+  "Great Elder",
+  "Heavenly Elder",
+  "Supreme Sect Master",
+];
 
 export default function Dashboard() {
   const { data: user, isLoading: userLoading } = useQuery({
@@ -21,17 +48,24 @@ export default function Dashboard() {
     retry: false,
   });
 
-  const { data: activities } = useQuery({
-    queryKey: [`/api/activities/${MOCK_USER.serverId}`],
-    retry: false,
-  });
+  const isSectMaster = user?.isSupremeSectMaster || serverSettings?.sectMasterId === MOCK_USER.discordId;
+  const userRank = user?.rank || "Outer Disciple";
+  const rankInfo = rankHierarchy[userRank as keyof typeof rankHierarchy] || rankHierarchy["Outer Disciple"];
+  
+  // Find next rank
+  const currentRankIndex = rankProgression.indexOf(userRank);
+  const nextRankIndex = Math.min(currentRankIndex + 1, rankProgression.length - 1);
+  const nextRank = rankProgression[nextRankIndex];
+  const nextRankInfo = rankHierarchy[nextRank as keyof typeof rankHierarchy];
 
-  const { data: leaderboard } = useQuery({
-    queryKey: [`/api/leaderboard/${MOCK_USER.serverId}`],
-    retry: false,
-  });
+  // Calculate progression
+  const nextLevelXp = Math.floor(user?.level * 100 * (1.5 ** user?.level)) || 1000;
+  const xpProgress = Math.min((user?.xp / nextLevelXp) * 100, 100);
 
-  const isSectMaster = serverSettings?.sectMasterId === MOCK_USER.discordId;
+  const hasPermission = (permission: string) => {
+    if (isSectMaster) return true;
+    return rankInfo.permissions.includes(permission);
+  };
 
   if (userLoading) {
     return (
@@ -50,190 +84,128 @@ export default function Dashboard() {
         <div className="text-center max-w-md">
           <Crown className="w-16 h-16 text-purple-500 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-white mb-2">Void Paragon</h1>
-          <p className="text-slate-400 mb-6">Join a Discord server with the Void Paragon Bot to begin your cultivation journey</p>
-          <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-sm text-slate-300">
-            Invite the bot to your server to get started
-          </div>
+          <p className="text-slate-400">Join a Discord server with the Void Paragon Bot to begin your cultivation journey</p>
         </div>
       </div>
     );
   }
 
-  const realmColors: Record<string, string> = {
-    "Connate Realm": "from-slate-400 to-slate-500",
-    "Spirit Realm": "from-blue-400 to-blue-600",
-    "Deity Realm": "from-purple-400 to-purple-600",
-    "Dao Realm": "from-indigo-400 to-indigo-600",
-    "True Spirit Realm": "from-cyan-400 to-cyan-600",
-    "Immortal Ascension Realm": "from-yellow-400 to-yellow-600",
-    "True God Realm": "from-red-400 to-red-600",
-  };
-
-  const gradientClass = realmColors[user.realm] || "from-purple-400 to-purple-600";
-  const nextLevelXp = Math.floor(user.level * 100 * (1.5 ** user.level));
-  const xpProgress = Math.min((user.xp / nextLevelXp) * 100, 100);
-
-  const recentActivityItems = [
-    {
-      id: 1,
-      icon: Sword,
-      title: "Victory in Battle",
-      description: "Defeated Shadow Master in PvP",
-      time: "2 minutes ago",
-      color: "text-green-400",
-    },
-    {
-      id: 2,
-      icon: TrendingUp,
-      title: "Level Up",
-      description: "Reached Level 42",
-      time: "1 hour ago",
-      color: "text-yellow-400",
-    },
-    {
-      id: 3,
-      icon: Gem,
-      title: "Item Acquired",
-      description: "Obtained Celestial Sword",
-      time: "3 hours ago",
-      color: "text-purple-400",
-    },
-    {
-      id: 4,
-      icon: Crown,
-      title: "Rank Achievement",
-      description: "Promoted to Core Disciple",
-      time: "1 day ago",
-      color: "text-blue-400",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
-      {/* Header Section */}
-      <div className="border-b border-purple-900/50 bg-gradient-to-r from-slate-950/80 to-purple-900/30 backdrop-blur-sm sticky top-0 z-10">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 border-b border-purple-900/50 bg-slate-950/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Void Paragon Dashboard
-          </h1>
           <div className="flex items-center gap-4">
-            <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0">
-              {user.rank}
+            <Crown className="w-6 h-6 text-purple-500" />
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              {isSectMaster ? "Supreme Control Center" : "Cultivation Dashboard"}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {isSectMaster && (
+              <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white border-0 flex items-center gap-1">
+                <Eye className="w-3 h-3" /> Supreme Master
+              </Badge>
+            )}
+            <Badge className={`border-0 text-white ${
+              rankInfo.level >= 14 ? "bg-gradient-to-r from-yellow-500 to-orange-500" :
+              rankInfo.level >= 12 ? "bg-gradient-to-r from-purple-500 to-pink-500" :
+              rankInfo.level >= 10 ? "bg-gradient-to-r from-blue-500 to-cyan-500" :
+              "bg-gradient-to-r from-slate-500 to-slate-600"
+            }`}>
+              {userRank}
             </Badge>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Hero Card - User Profile */}
-        <div className="mb-8 relative">
-          <div className={`absolute inset-0 bg-gradient-to-r ${gradientClass} rounded-xl opacity-20 blur-xl`} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        {/* SECTION 1: HERO PROFILE */}
+        <div className="relative group">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
           <Card className="relative border-purple-500/30 bg-slate-900/50 backdrop-blur-sm overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl -mr-20 -mt-20" />
-            <CardContent className="p-8">
-              <div className="relative z-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Left - User Info */}
-                  <div>
-                    <div className="mb-6">
-                      <h2 className="text-4xl font-bold text-white mb-2">{user.username}</h2>
-                      <p className={`text-lg bg-gradient-to-r ${gradientClass} bg-clip-text text-transparent font-semibold`}>
-                        {user.realm}
-                      </p>
-                      <p className="text-slate-400 text-sm">Level {user.level}</p>
-                    </div>
-
+            <CardContent className="p-8 relative z-10">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Profile Info */}
+                <div className="md:col-span-2">
+                  <h2 className="text-4xl font-bold text-white mb-1">{user.username}</h2>
+                  <p className="text-purple-300 text-lg mb-4">{user.realm} • Level {user.level}</p>
+                  
+                  <div className="space-y-4">
                     {/* XP Progress */}
-                    <div className="space-y-2 mb-6">
-                      <div className="flex justify-between text-sm">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
                         <span className="text-slate-400">Cultivation Progress</span>
-                        <span className="text-purple-300 font-mono">
-                          {user.xp.toLocaleString()} / {nextLevelXp.toLocaleString()}
-                        </span>
+                        <span className="text-purple-300 font-mono">{user.xp.toLocaleString()} / {nextLevelXp.toLocaleString()} XP</span>
                       </div>
                       <Progress value={xpProgress} className="h-2" />
                     </div>
 
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* Core Stats */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Power</p>
-                        <p className="text-lg font-bold text-green-400">{user.power}</p>
+                        <p className="text-lg font-bold text-green-400">{user.power || 0}</p>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Defense</p>
-                        <p className="text-lg font-bold text-blue-400">{user.defense}</p>
+                        <p className="text-lg font-bold text-blue-400">{user.defense || 0}</p>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Agility</p>
-                        <p className="text-lg font-bold text-yellow-400">{user.agility}</p>
+                        <p className="text-lg font-bold text-yellow-400">{user.agility || 0}</p>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Wisdom</p>
-                        <p className="text-lg font-bold text-purple-400">{user.wisdom}</p>
+                        <p className="text-lg font-bold text-purple-400">{user.wisdom || 0}</p>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Right - Currencies & Info */}
-                  <div className="space-y-4">
-                    {/* Currency Cards */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-slate-400 text-sm">Void Crystals</p>
-                            <p className="text-2xl font-bold text-purple-300">{user.voidCrystals}</p>
-                          </div>
-                          <Gem className="w-8 h-8 text-purple-400" />
-                        </div>
+                {/* Rank Progression Card */}
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-lg p-4">
+                    <p className="text-slate-400 text-sm mb-3">Current Rank</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-white font-bold">{userRank}</span>
+                      <span className="text-purple-300 font-mono text-sm">Lvl {rankInfo.level}</span>
+                    </div>
+                    <div className="text-xs space-y-1 text-slate-300">
+                      <p>• VC Multiplier: {rankInfo.multiplier}x</p>
+                      <p>• Permissions: {rankInfo.permissions.length}</p>
+                    </div>
+                  </div>
+
+                  {nextRankIndex < rankProgression.length - 1 && (
+                    <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 rounded-lg p-4">
+                      <p className="text-slate-400 text-sm mb-3">Next Rank</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-white font-bold">{nextRank}</span>
+                        <ChevronRight className="w-4 h-4 text-blue-300" />
                       </div>
-                      <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-slate-400 text-sm">Sect Points</p>
-                            <p className="text-2xl font-bold text-blue-300">{user.sectPoints || 0}</p>
-                          </div>
-                          <Crown className="w-8 h-8 text-blue-400" />
-                        </div>
+                      <div className="text-xs space-y-1 text-slate-300 mb-3">
+                        <p>• VC Multiplier: {nextRankInfo?.multiplier}x</p>
+                        <p>• New Permissions: +{(nextRankInfo?.permissions?.length || 0)}</p>
+                      </div>
+                      <div className="pt-3 border-t border-blue-500/20">
+                        <p className="text-blue-300 font-semibold text-xs">Requirements:</p>
+                        <p className="text-slate-400 text-xs mt-1">Reach Level 50 + 100k XP</p>
                       </div>
                     </div>
+                  )}
 
-                    {/* Faction/Clan Info */}
-                    {(user.factionId || user.clanId) && (
-                      <div className="space-y-2">
-                        {user.factionId && (
-                          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
-                            <p className="text-slate-400 text-xs mb-1">Faction</p>
-                            <p className="text-white font-semibold">{user.factionName || "Unknown Faction"}</p>
-                          </div>
-                        )}
-                        {user.clanId && (
-                          <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3">
-                            <p className="text-slate-400 text-xs mb-1">Clan</p>
-                            <p className="text-white font-semibold">{user.clanName || "Unknown Clan"}</p>
-                            <p className="text-slate-400 text-xs">{user.clanRole}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Quick Stats */}
-                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
-                      <div className="grid grid-cols-3 gap-3 text-center">
-                        <div>
-                          <p className="text-slate-400 text-xs">Wins</p>
-                          <p className="text-lg font-bold text-green-400">{user.battleWins || 0}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 text-xs">Losses</p>
-                          <p className="text-lg font-bold text-red-400">{user.battleLosses || 0}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 text-xs">Rank</p>
-                          <p className="text-lg font-bold text-purple-400">#{user.rank}</p>
-                        </div>
-                      </div>
+                  {/* Currencies */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-lg p-3">
+                      <p className="text-slate-400 text-xs mb-1">Void Crystals</p>
+                      <p className="text-lg font-bold text-purple-300">{user.voidCrystals}</p>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/30 rounded-lg p-3">
+                      <p className="text-slate-400 text-xs mb-1">Sect Points</p>
+                      <p className="text-lg font-bold text-blue-300">{user.sectPoints || 0}</p>
                     </div>
                   </div>
                 </div>
@@ -242,18 +214,17 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions Grid */}
-        <div className="mb-8">
+        {/* SECTION 2: QUICK ACTIONS */}
+        <div>
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-purple-400" />
-            Quick Actions
+            <Zap className="w-5 h-5 text-purple-400" /> Quick Access
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link href="/missions" data-testid="link-missions">
-              <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all duration-200 hover:border-purple-500/50 group">
+              <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg group-hover:from-purple-500/30 group-hover:to-purple-600/20 transition-all">
+                    <div className="p-2 bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg group-hover:from-purple-500/30 group-hover:to-purple-600/20">
                       <Flame className="w-5 h-5 text-purple-400" />
                     </div>
                     <div>
@@ -266,10 +237,10 @@ export default function Dashboard() {
             </Link>
 
             <Link href="/inventory" data-testid="link-inventory">
-              <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all duration-200 hover:border-purple-500/50 group">
+              <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg group-hover:from-blue-500/30 group-hover:to-blue-600/20 transition-all">
+                    <div className="p-2 bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg group-hover:from-blue-500/30 group-hover:to-blue-600/20">
                       <Gem className="w-5 h-5 text-blue-400" />
                     </div>
                     <div>
@@ -281,33 +252,37 @@ export default function Dashboard() {
               </Card>
             </Link>
 
-            <Link href="/profile" data-testid="link-profile">
-              <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all duration-200 hover:border-purple-500/50 group">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-lg group-hover:from-yellow-500/30 group-hover:to-yellow-600/20 transition-all">
-                      <Crown className="w-5 h-5 text-yellow-400" />
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-sm">Profile</p>
-                      <p className="text-slate-400 text-xs">Your stats</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {isSectMaster && (
-              <Link href="/admin" data-testid="link-admin">
-                <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all duration-200 hover:border-red-500/50 group">
+            {/* Spar - available to Inheritor Disciples+ */}
+            {(hasPermission("spar") || rankInfo.level >= 9) && (
+              <Link href="/spar" data-testid="link-spar">
+                <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-lg group-hover:from-red-500/30 group-hover:to-red-600/20 transition-all">
-                        <Sword className="w-5 h-5 text-red-400" />
+                      <div className="p-2 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-lg group-hover:from-red-500/30 group-hover:to-red-600/20">
+                        <Flame className="w-5 h-5 text-red-400" />
                       </div>
                       <div>
-                        <p className="text-white font-semibold text-sm">Admin</p>
-                        <p className="text-slate-400 text-xs">Management</p>
+                        <p className="text-white font-semibold text-sm">Spar</p>
+                        <p className="text-slate-400 text-xs">Battle others</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+
+            {/* Shop - available to Core Disciples+ */}
+            {(hasPermission("shop") || rankInfo.level >= 11) && (
+              <Link href="/shop" data-testid="link-shop">
+                <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-lg group-hover:from-yellow-500/30 group-hover:to-yellow-600/20">
+                        <Gem className="w-5 h-5 text-yellow-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold text-sm">Shop</p>
+                        <p className="text-slate-400 text-xs">Buy items</p>
                       </div>
                     </div>
                   </CardContent>
@@ -317,99 +292,232 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Two Column Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Recent Activity */}
-          <div className="lg:col-span-2">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-purple-400" />
-              Recent Activity
-            </h3>
-            <Card className="border-slate-700/50 bg-slate-900/50">
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {recentActivityItems.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <div key={item.id} className="flex items-start gap-4 pb-4 border-b border-slate-700/30 last:pb-0 last:border-0">
-                        <div className={`p-2 rounded-lg bg-slate-800/50 ${item.color}`}>
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold text-sm">{item.title}</p>
-                          <p className="text-slate-400 text-sm truncate">{item.description}</p>
-                          <p className="text-slate-500 text-xs mt-1">{item.time}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
+        {/* SECTION 3: ACTIVE EVENTS - AVAILABLE TO EVERYONE */}
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-blue-400" /> Active Events
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-blue-600/5">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-blue-300 font-semibold text-sm">Void Sect Defense</p>
+                    <p className="text-slate-400 text-xs">Alien invasion event</p>
+                  </div>
+                  <Badge className="bg-blue-500/30 text-blue-300 border-blue-500/50">Active</Badge>
                 </div>
+                <p className="text-slate-400 text-xs mb-3">Defenders: 12 disciples • Req: Spirit Realm+</p>
+                <Button size="sm" data-testid="button-join-event">Join Defense</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-green-500/30 bg-gradient-to-br from-green-500/10 to-green-600/5">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-green-300 font-semibold text-sm">Treasure Hunt</p>
+                    <p className="text-slate-400 text-xs">Find hidden treasures</p>
+                  </div>
+                  <Badge className="bg-green-500/30 text-green-300 border-green-500/50">Active</Badge>
+                </div>
+                <p className="text-slate-400 text-xs mb-3">Participants: 28 • Ends in 2 hours</p>
+                <Button size="sm" data-testid="button-join-treasure">Join Now</Button>
               </CardContent>
             </Card>
           </div>
 
-          {/* Leaderboard Preview */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Award className="w-5 h-5 text-purple-400" />
-              Top Cultivators
-            </h3>
-            <Card className="border-slate-700/50 bg-slate-900/50">
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  {[1, 2, 3, 4, 5].map((rank) => (
-                    <div key={rank} className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition-colors">
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                          rank === 1 ? 'bg-yellow-500/30 text-yellow-300' :
-                          rank === 2 ? 'bg-slate-400/30 text-slate-200' :
-                          rank === 3 ? 'bg-orange-500/30 text-orange-300' :
-                          'bg-purple-500/30 text-purple-300'
-                        }`}>
-                          {rank}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-white font-semibold text-sm truncate">Player {rank}</p>
-                          <p className="text-slate-400 text-xs">Level 50</p>
-                        </div>
-                      </div>
-                      <p className="text-purple-300 font-semibold text-sm ml-2">⭐</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Event Management - Only for those with permission */}
+          {hasPermission("events") && (
+            <div className="mt-4">
+              <Button size="sm" variant="outline" data-testid="button-create-event" className="w-full">
+                Create New Event
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Stats Overview */}
+        {/* SECTION 4: ROLE-SPECIFIC FEATURES */}
+        <div className="space-y-8">
+          
+          {/* Treasury - Available to Core Disciples+ */}
+          {hasPermission("treasury") && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Gem className="w-5 h-5 text-purple-400" /> Treasury Management
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="border-slate-700/50 bg-slate-900/50">
+                  <CardContent className="p-4">
+                    <p className="text-slate-400 text-sm mb-2">Sect Treasury</p>
+                    <p className="text-3xl font-bold text-purple-300 mb-2">50,000 VC</p>
+                    <Button size="sm" variant="outline" data-testid="button-manage-treasury">Manage</Button>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-700/50 bg-slate-900/50">
+                  <CardContent className="p-4">
+                    <p className="text-slate-400 text-sm mb-2">Daily Distribution</p>
+                    <p className="text-3xl font-bold text-blue-300 mb-2">5,000 VC</p>
+                    <Button size="sm" variant="outline" data-testid="button-treasury-settings">Settings</Button>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Moderation - Available to Elders+ */}
+          {hasPermission("moderation") && (
+            <div>
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-orange-400" /> Moderation Panel
+              </h3>
+              <Card className="border-slate-700/50 bg-slate-900/50">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <div>
+                      <p className="text-white font-semibold text-sm">User Strikes</p>
+                      <p className="text-slate-400 text-xs">3-strike moderation system</p>
+                    </div>
+                    <Button size="sm" variant="outline" data-testid="button-manage-strikes">Manage</Button>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
+                    <div>
+                      <p className="text-white font-semibold text-sm">Ban List</p>
+                      <p className="text-slate-400 text-xs">View banned members</p>
+                    </div>
+                    <Button size="sm" variant="outline" data-testid="button-manage-bans">View</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+
+          {/* Supreme Master Controls */}
+          {isSectMaster && (
+            <div className="border-l-4 border-red-500 bg-gradient-to-r from-red-500/10 to-transparent p-6 rounded-lg">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Crown className="w-5 h-5 text-red-400" /> Supreme Sect Master Authority
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Link href="/admin" data-testid="link-admin-panel">
+                  <Card className="border-red-500/30 bg-red-900/20 hover:bg-red-900/30 cursor-pointer transition-all h-full">
+                    <CardContent className="p-4">
+                      <Settings className="w-5 h-5 text-red-400 mb-2" />
+                      <p className="text-white font-semibold text-sm">Full Admin Panel</p>
+                      <p className="text-slate-400 text-xs">Complete control</p>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                <Card className="border-red-500/30 bg-red-900/20">
+                  <CardContent className="p-4">
+                    <Users className="w-5 h-5 text-red-400 mb-2" />
+                    <p className="text-white font-semibold text-sm">Member Management</p>
+                    <p className="text-slate-400 text-xs">142 active disciples</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-red-500/30 bg-red-900/20">
+                  <CardContent className="p-4">
+                    <Award className="w-5 h-5 text-red-400 mb-2" />
+                    <p className="text-white font-semibold text-sm">Rank Management</p>
+                    <p className="text-slate-400 text-xs">Promote/demote members</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-red-500/30 bg-red-900/20">
+                  <CardContent className="p-4">
+                    <TrendingUp className="w-5 h-5 text-red-400 mb-2" />
+                    <p className="text-white font-semibold text-sm">Server Stats</p>
+                    <p className="text-slate-400 text-xs">Activity & analytics</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-red-500/30 bg-red-900/20">
+                  <CardContent className="p-4">
+                    <Gem className="w-5 h-5 text-red-400 mb-2" />
+                    <p className="text-white font-semibold text-sm">Treasury Control</p>
+                    <p className="text-slate-400 text-xs">Global sect treasury</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-red-500/30 bg-red-900/20">
+                  <CardContent className="p-4">
+                    <AlertCircle className="w-5 h-5 text-red-400 mb-2" />
+                    <p className="text-white font-semibold text-sm">Emergency Controls</p>
+                    <p className="text-slate-400 text-xs">System-wide actions</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* SECTION 4: FACTION & CLAN STATUS */}
+        {(user.factionId || user.clanId) && (
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-400" /> Organizations
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {user.factionId && (
+                <Card className="border-slate-700/50 bg-slate-900/50">
+                  <CardContent className="p-4">
+                    <p className="text-slate-400 text-xs mb-2">FACTION</p>
+                    <p className="text-white font-bold mb-2">{user.factionName || "Unknown Faction"}</p>
+                    <p className="text-slate-400 text-sm mb-3">Role: {user.factionRank}</p>
+                    <Button size="sm" variant="outline" data-testid="button-faction-details">View Faction</Button>
+                  </CardContent>
+                </Card>
+              )}
+              {user.clanId && (
+                <Card className="border-slate-700/50 bg-slate-900/50">
+                  <CardContent className="p-4">
+                    <p className="text-slate-400 text-xs mb-2">CLAN</p>
+                    <p className="text-white font-bold mb-2">{user.clanName || "Unknown Clan"}</p>
+                    <p className="text-slate-400 text-sm mb-3">Position: {user.clanRole}</p>
+                    <Button size="sm" variant="outline" data-testid="button-clan-details">View Clan</Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 5: PERMISSION GUIDE */}
         <div>
-          <h3 className="text-lg font-semibold text-white mb-4">Server Statistics</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="border-slate-700/50 bg-slate-900/50">
-              <CardContent className="p-4">
-                <p className="text-slate-400 text-xs mb-2">Active Players</p>
-                <p className="text-2xl font-bold text-purple-400">142</p>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-700/50 bg-slate-900/50">
-              <CardContent className="p-4">
-                <p className="text-slate-400 text-xs mb-2">Factions</p>
-                <p className="text-2xl font-bold text-blue-400">3</p>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-700/50 bg-slate-900/50">
-              <CardContent className="p-4">
-                <p className="text-slate-400 text-xs mb-2">Clans</p>
-                <p className="text-2xl font-bold text-green-400">8</p>
-              </CardContent>
-            </Card>
-            <Card className="border-slate-700/50 bg-slate-900/50">
-              <CardContent className="p-4">
-                <p className="text-slate-400 text-xs mb-2">Total Battles</p>
-                <p className="text-2xl font-bold text-yellow-400">892</p>
-              </CardContent>
-            </Card>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Unlock className="w-5 h-5 text-slate-400" /> Rank Permissions Guide
+          </h3>
+          <div className="space-y-2">
+            {rankProgression.map((rank) => {
+              const info = rankHierarchy[rank as keyof typeof rankHierarchy];
+              const isCurrentRank = rank === userRank;
+              return (
+                <div
+                  key={rank}
+                  className={`p-3 rounded-lg border transition-all ${
+                    isCurrentRank
+                      ? "bg-gradient-to-r from-purple-500/20 to-purple-600/10 border-purple-500/50"
+                      : "bg-slate-900/50 border-slate-700/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {isCurrentRank && <Badge className="bg-purple-500">Current</Badge>}
+                      <div>
+                        <p className={`font-semibold text-sm ${isCurrentRank ? "text-white" : "text-slate-300"}`}>
+                          {rank}
+                        </p>
+                        <p className="text-xs text-slate-400">{info.permissions.join(", ") || "Basic access"}</p>
+                      </div>
+                    </div>
+                    <span className="text-slate-400 text-xs">{info.multiplier}x VC</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
