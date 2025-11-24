@@ -393,6 +393,267 @@ export const dailyActivityLogs = pgTable("daily_activity_logs", {
   reportedAt: timestamp("reported_at").defaultNow(),
 });
 
+// Enhanced Clan/Faction Progression System
+// Add progression to clans and factions with levels, perks, and territories
+export const clanProgression = pgTable("clan_progression", {
+  id: serial("id").primaryKey(),
+  clanId: integer("clan_id").notNull().unique(),
+  level: integer("level").notNull().default(1), // 1-10
+  xp: integer("xp").notNull().default(0),
+  xpRequired: integer("xp_required").notNull().default(1000), // XP to next level
+  perks: jsonb("perks"), // Unlocked perks per level
+  territories: jsonb("territories"), // Controlled territories {name, bonuses}
+  lastXpGainAt: timestamp("last_xp_gain_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const factionProgression = pgTable("faction_progression", {
+  id: serial("id").primaryKey(),
+  factionId: integer("faction_id").notNull().unique(),
+  level: integer("level").notNull().default(1), // 1-10
+  xp: integer("xp").notNull().default(0),
+  xpRequired: integer("xp_required").notNull().default(1000),
+  perks: jsonb("perks"),
+  territories: jsonb("territories"),
+  lastXpGainAt: timestamp("last_xp_gain_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Dungeons and Raids System
+export const dungeons = pgTable("dungeons", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  maxPartySize: integer("max_party_size").notNull().default(5),
+  recommendedLevel: integer("recommended_level").notNull().default(1),
+  difficulty: text("difficulty").notNull(), // easy, normal, hard, nightmare
+  rewards: jsonb("rewards"), // {xp, voidCrystals, sectPoints, artifacts}
+  boss: jsonb("boss"), // {name, health, attacks, rewards}
+  icon: text("icon"),
+  serverId: text("server_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const raids = pgTable("raids", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  maxPartySize: integer("max_party_size").notNull().default(10),
+  difficulty: text("difficulty").notNull(), // normal, hard, nightmare, impossible
+  duration: integer("duration").notNull(), // hours
+  rewards: jsonb("rewards"),
+  bosses: jsonb("bosses"), // Multiple bosses
+  icon: text("icon"),
+  clanOnly: boolean("clan_only").notNull().default(false), // If true, only clans can participate
+  serverId: text("server_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const dungeonRuns = pgTable("dungeon_runs", {
+  id: serial("id").primaryKey(),
+  dungeonId: integer("dungeon_id").notNull(),
+  partyLeaderId: integer("party_leader_id").notNull(),
+  partyMembers: jsonb("party_members"), // {id, name, realm, level}
+  status: text("status").notNull(), // active, completed, failed
+  reward: jsonb("reward"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const raidRuns = pgTable("raid_runs", {
+  id: serial("id").primaryKey(),
+  raidId: integer("raid_id").notNull(),
+  clanId: integer("clan_id"),
+  partyLeaderId: integer("party_leader_id").notNull(),
+  partyMembers: jsonb("party_members"),
+  status: text("status").notNull(),
+  reward: jsonb("reward"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Artifacts System (Legendary Loot)
+export const artifacts = pgTable("artifacts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  rarity: rarityEnum("rarity").notNull(),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  passiveAbility: jsonb("passive_ability"), // {name, effect, bonus}
+  activeAbility: jsonb("active_ability"), // {name, effect, cooldown}
+  powerBonus: integer("power_bonus").notNull().default(0),
+  defenseBonus: integer("defense_bonus").notNull().default(0),
+  agilityBonus: integer("agility_bonus").notNull().default(0),
+  wisdomBonus: integer("wisdom_bonus").notNull().default(0),
+  icon: text("icon"),
+});
+
+export const userArtifacts = pgTable("user_artifacts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  artifactId: integer("artifact_id").notNull(),
+  isEquipped: boolean("is_equipped").notNull().default(false),
+  acquiredAt: timestamp("acquired_at").defaultNow(),
+});
+
+// Achievements System
+export const achievements = pgTable("achievements", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  requirement: jsonb("requirement"), // {type, value} e.g., {type: "battles", value: 100}
+  rewardXp: integer("reward_xp").notNull().default(0),
+  rewardCrystals: integer("reward_crystals").notNull().default(0),
+  badge: text("badge"), // Badge icon/name
+  icon: text("icon"),
+  rarity: rarityEnum("rarity").notNull().default("common"),
+});
+
+export const userAchievements = pgTable("user_achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  achievementId: integer("achievement_id").notNull(),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+  progress: integer("progress").notNull().default(0), // For multi-step achievements
+});
+
+// Seasonal Leagues System
+export const seasonalLeagues = pgTable("seasonal_leagues", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  season: integer("season").notNull(), // Season number
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  resetSchedule: text("reset_schedule").notNull(), // daily, weekly, monthly
+  rewardTier: jsonb("reward_tier"), // Rewards per placement
+  serverId: text("server_id").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const leagueParticipants = pgTable("league_participants", {
+  id: serial("id").primaryKey(),
+  leagueId: integer("league_id").notNull(),
+  userId: integer("user_id").notNull(),
+  rank: integer("rank"),
+  points: integer("points").notNull().default(0),
+  reward: jsonb("reward"),
+  rewardClaimed: boolean("reward_claimed").notNull().default(false),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+// Daily Quests System
+export const dailyQuests = pgTable("daily_quests", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // battle, gather, social, explore
+  requirement: jsonb("requirement"), // {type, value}
+  reward: jsonb("reward"), // {xp, crystals, sectPoints}
+  resetTime: text("reset_time").notNull().default("00:00"), // HH:MM UTC
+  icon: text("icon"),
+  serverId: text("server_id").notNull(),
+});
+
+export const userDailyQuests = pgTable("user_daily_quests", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  questId: integer("quest_id").notNull(),
+  progress: integer("progress").notNull().default(0),
+  completed: boolean("completed").notNull().default(false),
+  rewardClaimed: boolean("reward_claimed").notNull().default(false),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// Pet/Companion System
+export const pets = pgTable("pets", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // spirit_beast, celestial, demon, etc
+  rarity: rarityEnum("rarity").notNull(),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  statBonus: jsonb("stat_bonus"), // {power, defense, agility, wisdom}
+  specialAbility: jsonb("special_ability"),
+  icon: text("icon"),
+});
+
+export const userPets = pgTable("user_pets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  petId: integer("pet_id").notNull(),
+  level: integer("level").notNull().default(1),
+  xp: integer("xp").notNull().default(0),
+  xpRequired: integer("xp_required").notNull().default(500),
+  affection: integer("affection").notNull().default(0),
+  equippedAt: timestamp("equipped_at"),
+  acquiredAt: timestamp("acquired_at").defaultNow(),
+});
+
+// NPC Trading/Quest Chain System
+export const npcs = pgTable("npcs", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // trader, questgiver, merchant
+  location: text("location"), // Channel or location name
+  dialogue: jsonb("dialogue"), // Conversation snippets
+  quests: jsonb("quests"), // Available quest IDs
+  tradingItems: jsonb("trading_items"), // Items they buy/sell
+  icon: text("icon"),
+  serverId: text("server_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const questChains = pgTable("quest_chains", {
+  id: serial("id").primaryKey(),
+  npcId: integer("npc_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  quests: jsonb("quests"), // Array of quest objects with requirements
+  reward: jsonb("reward"), // Final reward for completing chain
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const userQuestChain = pgTable("user_quest_chains", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  chainId: integer("chain_id").notNull(),
+  currentQuestIndex: integer("current_quest_index").notNull().default(0),
+  completed: boolean("completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  startedAt: timestamp("started_at").defaultNow(),
+});
+
+// Prestige System (Reset with permanent bonuses)
+export const prestige = pgTable("prestige", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  prestigeLevel: integer("prestige_level").notNull().default(0),
+  totalResets: integer("total_resets").notNull().default(0),
+  permanentBonuses: jsonb("permanent_bonuses"), // {xpMultiplier, dropRate, etc}
+  lastResetAt: timestamp("last_reset_at"),
+});
+
+// Trading/Market System
+export const marketListings = pgTable("market_listings", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("seller_id").notNull(),
+  itemId: integer("item_id"),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  price: integer("price").notNull(), // In void crystals
+  itemType: text("item_type").notNull(), // item, artifact, weapon, etc
+  status: text("status").notNull().default("active"), // active, sold, cancelled
+  boughtById: integer("bought_by_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  soldAt: timestamp("sold_at"),
+  serverId: text("server_id").notNull(),
+});
+
 // Relations
 export const userRelations = relations(users, ({ one, many }) => ({
   bloodline: one(bloodlines, {
@@ -571,6 +832,25 @@ export const insertServerSettingsSchema = createInsertSchema(serverSettings).omi
   updatedAt: true,
 });
 
+export const insertClanProgressionSchema = createInsertSchema(clanProgression).omit({ id: true, createdAt: true, updatedAt: true, lastXpGainAt: true });
+export const insertFactionProgressionSchema = createInsertSchema(factionProgression).omit({ id: true, createdAt: true, updatedAt: true, lastXpGainAt: true });
+export const insertDungeonSchema = createInsertSchema(dungeons).omit({ id: true, createdAt: true });
+export const insertRaidSchema = createInsertSchema(raids).omit({ id: true, createdAt: true });
+export const insertArtifactSchema = createInsertSchema(artifacts).omit({ id: true });
+export const insertUserArtifactSchema = createInsertSchema(userArtifacts).omit({ id: true, acquiredAt: true });
+export const insertAchievementSchema = createInsertSchema(achievements).omit({ id: true });
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({ id: true, unlockedAt: true });
+export const insertSeasonalLeagueSchema = createInsertSchema(seasonalLeagues).omit({ id: true });
+export const insertLeagueParticipantSchema = createInsertSchema(leagueParticipants).omit({ id: true, joinedAt: true });
+export const insertDailyQuestSchema = createInsertSchema(dailyQuests).omit({ id: true });
+export const insertUserDailyQuestSchema = createInsertSchema(userDailyQuests).omit({ id: true, assignedAt: true, completedAt: true });
+export const insertPetSchema = createInsertSchema(pets).omit({ id: true });
+export const insertUserPetSchema = createInsertSchema(userPets).omit({ id: true, equippedAt: true, acquiredAt: true });
+export const insertNpcSchema = createInsertSchema(npcs).omit({ id: true, createdAt: true });
+export const insertQuestChainSchema = createInsertSchema(questChains).omit({ id: true });
+export const insertPrestigeSchema = createInsertSchema(prestige).omit({ id: true, lastResetAt: true });
+export const insertMarketListingSchema = createInsertSchema(marketListings).omit({ id: true, createdAt: true, soldAt: true });
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -594,3 +874,21 @@ export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
 export type ServerSettings = typeof serverSettings.$inferSelect;
 export type InsertServerSettings = z.infer<typeof insertServerSettingsSchema>;
+export type ClanProgression = typeof clanProgression.$inferSelect;
+export type FactionProgression = typeof factionProgression.$inferSelect;
+export type Dungeon = typeof dungeons.$inferSelect;
+export type Raid = typeof raids.$inferSelect;
+export type Artifact = typeof artifacts.$inferSelect;
+export type UserArtifact = typeof userArtifacts.$inferSelect;
+export type Achievement = typeof achievements.$inferSelect;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type SeasonalLeague = typeof seasonalLeagues.$inferSelect;
+export type LeagueParticipant = typeof leagueParticipants.$inferSelect;
+export type DailyQuest = typeof dailyQuests.$inferSelect;
+export type UserDailyQuest = typeof userDailyQuests.$inferSelect;
+export type Pet = typeof pets.$inferSelect;
+export type UserPet = typeof userPets.$inferSelect;
+export type Npc = typeof npcs.$inferSelect;
+export type QuestChain = typeof questChains.$inferSelect;
+export type Prestige = typeof prestige.$inferSelect;
+export type MarketListing = typeof marketListings.$inferSelect;
