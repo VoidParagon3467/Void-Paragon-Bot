@@ -365,6 +365,34 @@ export const premiumPurchases = pgTable("premium_purchases", {
   serverId: text("server_id").notNull(),
 });
 
+// User strikes for moderation (3-strike system)
+export const userStrikes = pgTable("user_strikes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  strikeCount: integer("strike_count").notNull().default(1), // 1, 2, or 3
+  reason: text("reason").notNull(), // spam, cheating, insult, advertising, other
+  description: text("description"),
+  issuedAt: timestamp("issued_at").defaultNow(),
+  bannedUntil: timestamp("banned_until"), // For strike 2 - temp ban
+  isExpelled: boolean("is_expelled").notNull().default(false), // For strike 3 - permanent expulsion
+  serverId: text("server_id").notNull(),
+});
+
+// Daily activity logs (for reporting system)
+export const dailyActivityLogs = pgTable("daily_activity_logs", {
+  id: serial("id").primaryKey(),
+  serverId: text("server_id").notNull(),
+  discipleCount: integer("disciple_count").notNull().default(0),
+  elderCount: integer("elder_count").notNull().default(0),
+  totalMembers: integer("total_members").notNull().default(0),
+  totalXpGained: integer("total_xp_gained").notNull().default(0),
+  totalBreakthroughs: integer("total_breakthroughs").notNull().default(0),
+  totalBattles: integer("total_battles").notNull().default(0),
+  eventsTriggered: integer("events_triggered").notNull().default(0),
+  strikeIssued: integer("strikes_issued").notNull().default(0),
+  reportedAt: timestamp("reported_at").defaultNow(),
+});
+
 // Relations
 export const userRelations = relations(users, ({ one, many }) => ({
   bloodline: one(bloodlines, {

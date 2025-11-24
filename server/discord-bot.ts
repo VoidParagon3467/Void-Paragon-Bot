@@ -15,6 +15,7 @@ export class CultivationBot {
   private client: Client;
   private readonly TOKEN = process.env.DISCORD_TOKEN;
   private logThreadMap: Map<string, string> = new Map(); // Map of serverId to thread ID
+  private activeEvents: Map<string, number> = new Map(); // Track count of simultaneous events per server (max 3)
 
   constructor() {
     this.client = new Client({
@@ -137,6 +138,10 @@ export class CultivationBot {
           mentions: message.mentions.map(u => u.tag),
         });
       }
+      // Check for rule violations (moderation)
+      await this.checkModerationRules(message);
+      // Check for conversation topics when silent
+      await this.generateConversationTopicIfNeeded(message);
       await this.handleChatXp(message);
     });
 
@@ -197,8 +202,11 @@ export class CultivationBot {
     // Random events every 4 hours
     setInterval(() => this.triggerRandomEvent(), 4 * 60 * 60 * 1000);
     
-    // Daily events - trigger at midnight (TODO: Enable after database migration)
-    // setInterval(() => this.createDailyEvent(), 24 * 60 * 60 * 1000);
+    // Void Sect Defense events every 6 hours (alien attacks)
+    setInterval(() => this.triggerVoidSectDefense(), 6 * 60 * 60 * 1000);
+    
+    // Daily activity reporting
+    setInterval(() => this.reportDailyActivity(), 24 * 60 * 60 * 1000);
     
     // Meditation XP gain every 1 minute
     setInterval(() => this.distributeMeditationXp(), 60 * 1000);
@@ -213,7 +221,6 @@ export class CultivationBot {
     this.autoGenerateBloodlines().catch(console.error);
     this.postHallOfFameLeaderboards().catch(console.error);
     this.postPremiumRewards().catch(console.error);
-    // this.createDailyEvent().catch(console.error);
   }
 
   private async postPremiumRewards() {
@@ -2880,6 +2887,275 @@ export class CultivationBot {
       await interaction.editReply({
         content: "❌ Error posting chapter announcement.",
       });
+    }
+  }
+
+  // ====== NEW SYSTEMS: Events, Logging, Moderation, Conversation ======
+
+  private async triggerVoidSectDefense() {
+    try {
+      console.log("🛡️ VOID SECT DEFENSE: Alien invasion detected!");
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      for (const [serverId] of guilds) {
+        const currentEventCount = this.activeEvents.get(serverId) || 0;
+        if (currentEventCount >= 3) {
+          console.log(`⚠️ Server ${serverId} already has 3 events. Skipping.`);
+          continue; // Max 3 simultaneous events
+        }
+
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (!channels) continue;
+
+        const textChannel = channels.find((c: any) => c.isTextBased()) as any;
+        if (!textChannel || !('send' in textChannel)) continue;
+
+        const users = await storage.getUsersInServer(serverId);
+        const alienWave = Math.floor(Math.random() * 3) + 1;
+        const waveHealth = 1000 + (alienWave * 500);
+
+        const embed = new EmbedBuilder()
+          .setTitle("⚠️ VOID SECT UNDER ATTACK! ⚠️")
+          .setDescription(`An alien invasion is upon us! **${alienWave}** waves of extraterrestrial forces attack!`)
+          .setColor(0xff0000)
+          .addFields(
+            { name: "🌀 Void Rift Stability", value: `${waveHealth}/${waveHealth} HP`, inline: false },
+            { name: "👾 Aliens Count", value: `Wave ${alienWave}: ${50 * alienWave} entities`, inline: true },
+            { name: "⚔️ Disciples Needed", value: `Min Realm: Spirit Realm (Level 4+)`, inline: true },
+            { name: "🏆 Victory Rewards", value: "Void Crystals, Custom Titles, Karma + XP Boost", inline: false },
+            { name: "💀 Defeat Penalty", value: "Lose Void Crystals, XP reset possible, Realm downgrade risk", inline: false }
+          )
+          .setTimestamp();
+
+        await textChannel.send({ embeds: [embed] }).catch(console.error);
+        this.activeEvents.set(serverId, currentEventCount + 1);
+
+        // Simulate defense battle
+        setTimeout(async () => {
+          const survivors = users.filter(u => cultivationRealms.indexOf(u.realm) >= 3);
+          
+          if (survivors.length > 0) {
+            const battleResult = Math.random() > 0.3 ? "victory" : "defeat";
+            
+            if (battleResult === "victory") {
+              const victoryEmbed = new EmbedBuilder()
+                .setTitle("🎉 VICTORY! The Sect is Saved!")
+                .setDescription(`${survivors.length} brave disciples defended the sect!`)
+                .setColor(0x00ff00)
+                .addFields({
+                  name: "Rewards Distributed",
+                  value: `Each defender gains:\n💎 1000 Void Crystals\n✨ 100 Sect Points\n🏆 Custom Title: "Void Sect Defender"`,
+                  inline: false,
+                });
+
+              for (const survivor of survivors) {
+                await storage.updateUser(survivor.id, {
+                  voidCrystals: survivor.voidCrystals + 1000,
+                  sectPoints: survivor.sectPoints + 100,
+                } as any);
+              }
+
+              await textChannel.send({ embeds: [victoryEmbed] }).catch(console.error);
+              await this.logBotEvent(serverId, "Events", "⚔️ Void Sect Defense: VICTORY", { survivors: survivors.length });
+            } else {
+              const defeatEmbed = new EmbedBuilder()
+                .setTitle("💀 DEFEAT! The Sect Falls...")
+                .setDescription("The aliens overwhelmed our defenses...")
+                .setColor(0x660000)
+                .addFields({
+                  name: "Consequences",
+                  value: `Each defender loses:\n💎 500 Void Crystals\n⚠️ 1 Level XP loss`,
+                  inline: false,
+                });
+
+              for (const survivor of survivors) {
+                const newVC = Math.max(0, survivor.voidCrystals - 500);
+                const newXP = Math.max(0, survivor.xp - 100);
+                await storage.updateUser(survivor.id, {
+                  voidCrystals: newVC,
+                  xp: newXP,
+                } as any);
+              }
+
+              await textChannel.send({ embeds: [defeatEmbed] }).catch(console.error);
+              await this.logBotEvent(serverId, "Events", "⚔️ Void Sect Defense: DEFEAT", { survivors: survivors.length });
+            }
+          }
+
+          this.activeEvents.set(serverId, Math.max(0, (this.activeEvents.get(serverId) || 1) - 1));
+        }, 30000);
+      }
+    } catch (error) {
+      console.error("Error in Void Sect Defense:", error);
+    }
+  }
+
+  private async reportDailyActivity() {
+    try {
+      console.log("📊 Reporting daily activity...");
+      const guilds = Array.from(this.client.guilds.cache.entries());
+
+      for (const [serverId] of guilds) {
+        const users = await storage.getUsersInServer(serverId);
+        const disciples = users.filter(u => {
+          const rank = u.rank || "Outer Disciple";
+          return ["Outer Disciple", "Inner Disciple", "Core Disciple", "Inheritor Disciple"].includes(rank);
+        });
+        const elders = users.filter(u => {
+          const rank = u.rank || "";
+          return ["Heavenly Elder", "Great Elder", "Elder"].includes(rank);
+        });
+
+        const logMsg = `📊 Daily Activity Report:\n👥 Total Members: ${users.length}\n📚 Disciples: ${disciples.length}\n⚔️ Elders: ${elders.length}`;
+        
+        await this.logBotEvent(serverId, "Reports", logMsg, {
+          date: new Date().toISOString(),
+          totalMembers: users.length,
+          discipleCount: disciples.length,
+          elderCount: elders.length,
+          topDiscipleXP: disciples.sort((a, b) => b.xp - a.xp)[0]?.username || "N/A",
+          topElderXP: elders.sort((a, b) => b.xp - a.xp)[0]?.username || "N/A",
+        });
+      }
+
+      console.log("✅ Daily activity report completed");
+    } catch (error) {
+      console.error("Error reporting daily activity:", error);
+    }
+  }
+
+  private async generateConversationTopicIfNeeded(message: any) {
+    try {
+      if (!message.guildId || message.mentions.size > 0) return;
+      
+      const channel = message.channel as any;
+      if (!channel.isTextBased()) return;
+
+      const recentMessages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+      if (!recentMessages) return;
+
+      const recentUserMessages = recentMessages.filter((m: any) => !m.author.bot && m.content.length > 0).size;
+      
+      if (recentUserMessages >= 2) return;
+      if (Math.random() > 0.1) return;
+
+      const xianxiaTopics = [
+        "If you could choose any Xianxia cultivation bloodline, which would it be?",
+        "What's your favorite Xianxia novel? Why?",
+        "Tribulation Lightning or Heavenly Dao Test - which sounds more terrifying?",
+        "What would your ideal sect look like?",
+        "If you had to pick a cultivation realm to stay at forever, which would it be?",
+        "What's the most interesting Xianxia artifact you've heard of?",
+        "Would you rather cultivate alone or in a sect?",
+        "What do you think is harder - maintaining power or achieving it?",
+        "If you met a real immortal, what would you ask them?",
+        "What's your favorite Xianxia character archetype?",
+      ];
+
+      const topic = xianxiaTopics[Math.floor(Math.random() * xianxiaTopics.length)];
+
+      const embed = new EmbedBuilder()
+        .setTitle("💭 Cultivator's Thought")
+        .setDescription(topic)
+        .setColor(0x9966ff)
+        .setFooter({ text: "Feel free to share your thoughts!" })
+        .setTimestamp();
+
+      await channel.send({ embeds: [embed] }).catch(console.error);
+    } catch (error) {
+      console.error("Error generating conversation topic:", error);
+    }
+  }
+
+  private async checkModerationRules(message: any) {
+    try {
+      if (message.author.bot || !message.guildId) return;
+
+      const user = await storage.getUserByDiscordId(message.author.id, message.guildId);
+      if (!user) return;
+
+      const elderRanks = ["Elder", "Great Elder", "Heavenly Elder", "Supreme Sect Master"];
+      if (user.rank && elderRanks.includes(user.rank)) return;
+
+      const content = message.content.toLowerCase();
+      let violation: { reason: string; description: string } | null = null;
+
+      if (content.includes("http") && !content.includes("discord")) {
+        violation = { reason: "advertising", description: "Posting external links/advertising" };
+      } else if (message.mentions.size > 5) {
+        violation = { reason: "spam", description: "Spam mentions (spam)" };
+      } else if (content.length > 500 && content === content.toUpperCase()) {
+        violation = { reason: "spam", description: "MASSIVE CAPS SPAM" };
+      } else if (content.includes("cheat") || content.includes("hack") || content.includes("exploit")) {
+        violation = { reason: "cheating", description: "Admitting to cheating/hacking" };
+      } else if (
+        content.includes("***") || content.includes("shit") || 
+        content.includes("damn") || (content.includes("hate") && content.includes("user"))
+      ) {
+        violation = { reason: "insult", description: "Explicit insults or cursing" };
+      }
+
+      if (!violation) return;
+
+      const existingStrikes = await storage.getUserStrikes(user.id);
+      const strikeCount = existingStrikes.length + 1;
+
+      if (strikeCount >= 3) {
+        await message.reply({
+          content: `❌ **${message.author.username}** - **EXPELLED FROM SECT!**\nStrike 3: ${violation.reason}\nYou have been permanently removed. Start over with /start.`,
+        });
+        
+        await storage.updateUser(user.id, { rank: "Expelled" } as any);
+        await storage.recordStrike(user.id, 3, violation.reason, violation.description, message.guildId);
+        
+        try {
+          const member = await message.guild.members.fetch(message.author.id);
+          const disciple = await message.guild.roles.cache.find(r => r.name.toLowerCase().includes("disciple"));
+          if (disciple && member) {
+            await member.roles.remove(disciple).catch(() => {});
+          }
+        } catch (e) {
+          console.error("Error removing roles:", e);
+        }
+
+        await this.logBotEvent(message.guildId, "Moderation", `🚫 User EXPELLED: ${message.author.tag}`, {
+          strikes: 3,
+          reason: violation.reason,
+          finalStrike: violation.description,
+        });
+      } else if (strikeCount === 2) {
+        const banUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await message.reply({
+          content: `⚠️ **${message.author.username}** - **STRIKE 2/3: TEMPORARY BAN**\nReason: ${violation.reason}\nYou are temporarily blocked until <t:${Math.floor(banUntil.getTime() / 1000)}:R>.`,
+        });
+
+        await storage.recordStrike(user.id, 2, violation.reason, violation.description, message.guildId, banUntil);
+
+        try {
+          const member = await message.guild.members.fetch(message.author.id);
+          await member.timeout(24 * 60 * 60 * 1000, `Moderation: ${violation.reason}`).catch(() => {});
+        } catch (e) {
+          console.error("Error timing out user:", e);
+        }
+
+        await this.logBotEvent(message.guildId, "Moderation", `⚠️ Strike 2 (24h ban): ${message.author.tag}`, {
+          reason: violation.reason,
+          bannedUntil: banUntil.toISOString(),
+        });
+      } else {
+        await message.reply({
+          content: `⚠️ **${message.author.username}** - **WARNING (Strike 1/3)**\nReason: ${violation.reason} - ${violation.description}\n2 more strikes and you're expelled. Respect sect rules!`,
+        });
+
+        await storage.recordStrike(user.id, 1, violation.reason, violation.description, message.guildId);
+
+        await this.logBotEvent(message.guildId, "Moderation", `⚠️ Strike 1: ${message.author.tag}`, {
+          reason: violation.reason,
+          description: violation.description,
+        });
+      }
+    } catch (error) {
+      console.error("Error in moderation check:", error);
     }
   }
 
