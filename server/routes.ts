@@ -5,8 +5,9 @@ import { storage } from "./storage";
 import { cultivationService } from "./cultivation";
 import { missionService } from "./missions";
 import { insertUserSchema, insertFactionSchema } from "@shared/schema";
+import { EmbedBuilder } from "discord.js";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express, botClient?: any): Promise<Server> {
   const httpServer = createServer(app);
   
   // WebSocket server for real-time updates
@@ -43,6 +44,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
   };
+
+  // Chapter announcement webhook for Jadescrolls integration
+  app.post("/api/chapter-announcement", async (req, res) => {
+    try {
+      const { serverId, chapterTitle, chapterUrl, chapterNumber, novelName, coverImage } = req.body;
+      
+      if (!serverId || !chapterTitle || !chapterUrl) {
+        return res.status(400).json({ error: "Missing required fields: serverId, chapterTitle, chapterUrl" });
+      }
+
+      const guild = botClient?.guilds?.cache?.get(serverId);
+      if (!guild) {
+        return res.status(404).json({ error: "Guild not found" });
+      }
+
+      const channels = guild.channels.cache;
+      
+      // Find or fallback channels
+      let announcementChannel = channels.find((c: any) => c.name === "announcements" || c.name === "announcement") as any;
+      if (!announcementChannel) {
+        announcementChannel = channels.find((c: any) => c.name === "general") as any;
+      }
+      
+      let discussionChannel = channels.find((c: any) => c.name.toLowerCase().includes("peerless") || c.name.toLowerCase().includes("immortal")) as any;
+      if (!discussionChannel && announcementChannel) {
+        discussionChannel = announcementChannel; // Fallback to announcement if no discussion channel
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📖 New Chapter Released: ${chapterTitle}`)
+        .setDescription(`**${novelName || "Peerless Immortal God"}** - Chapter ${chapterNumber || ""}`)
+        .setURL(chapterUrl)
+        .setColor(0xffd700)
+        .addFields({
+          name: "Read Now",
+          value: `[Open Chapter](${chapterUrl})`,
+          inline: true
+        })
+        .setTimestamp();
+
+      if (coverImage) {
+        embed.setThumbnail(coverImage);
+      }
+
+      const messages = [];
+      if (announcementChannel && 'send' in announcementChannel) {
+        const msg = await announcementChannel.send({ embeds: [embed] }).catch(console.error);
+        if (msg) messages.push(msg);
+      }
+
+      if (discussionChannel && discussionChannel.id !== announcementChannel?.id && 'send' in discussionChannel) {
+        const discussionEmbed = embed.clone()
+          .setTitle(`💬 Discussion: ${chapterTitle}`)
+          .setDescription(`**${novelName || "Peerless Immortal God"}** - Chapter ${chapterNumber || ""}\n\nWhat did you think of this chapter?`);
+        const msg = await discussionChannel.send({ embeds: [discussionEmbed] }).catch(console.error);
+        if (msg) messages.push(msg);
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Posted to ${messages.length} channel(s)`,
+        channels: messages.length
+      });
+    } catch (error) {
+      console.error("Chapter announcement error:", error);
+      res.status(500).json({ error: "Failed to post chapter announcement" });
+    }
+  });
   
   // User routes
   app.get("/api/users/:serverId", async (req, res) => {
