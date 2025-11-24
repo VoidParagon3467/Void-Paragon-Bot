@@ -638,6 +638,23 @@ export class CultivationBot {
                 .setRequired(true)
             )
         ),
+
+      // Sect Master exclusive announcement command
+      new SlashCommandBuilder()
+        .setName("sect_announcement")
+        .setDescription("Make a server-wide announcement (Supreme Sect Master only)")
+        .addStringOption((option) =>
+          option
+            .setName("title")
+            .setDescription("Announcement title")
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("message")
+            .setDescription("Announcement message")
+            .setRequired(true)
+        ),
     ];
 
     this.client.on("ready", async () => {
@@ -666,6 +683,26 @@ export class CultivationBot {
           avatar: member.user.displayAvatarURL(),
           serverId: member.guild.id,
         } as any);
+      }
+
+      // Send welcome message
+      const channels = member.guild.channels.cache;
+      const textChannel = channels.find((c: any) => c.isTextBased() && !c.isDMBased()) as any;
+      
+      if (textChannel && 'send' in textChannel) {
+        const welcomeEmbed = new EmbedBuilder()
+          .setTitle("🙏 Welcome to the Void Sect!")
+          .setDescription(`Welcome, new disciple **${member.user.username}**! 🌟\n\nYou have entered the legendary Void Sect. Begin your cultivation journey and ascend through 25 realms of power!`)
+          .setColor(0x9966ff)
+          .addFields(
+            { name: "Getting Started", value: "Use `/profile` to see your status\nUse `/cultivate` to gain XP\nUse `/breakthrough` when ready to advance realms", inline: false },
+            { name: "Daily Rewards", value: "Receive void crystals daily for login\nParticipate in events for rare treasures\nBuild your power steadily", inline: false },
+            { name: "Commands Available", value: "Type `/` to see all available commands", inline: false }
+          )
+          .setThumbnail(member.user.displayAvatarURL())
+          .setTimestamp();
+
+        await textChannel.send({ content: `Welcome, <@${member.user.id}>!`, embeds: [welcomeEmbed] }).catch(console.error);
       }
     } catch (error) {
       console.error("Error creating user profile:", error);
@@ -706,11 +743,35 @@ export class CultivationBot {
           newLevel = 9; // Cap at max level
         }
 
+        const realmChanged = newRealm !== user.realm;
+        
         await storage.updateUser(user.id, {
           level: newLevel,
           realm: newRealm,
           xp: newXp - xpToNextLevel,
         } as any);
+
+        // Announce realm breakthrough to the server
+        if (realmChanged) {
+          const channels = message.guild.channels.cache;
+          const textChannel = channels.find((c: any) => c.isTextBased() && !c.isDMBased()) as any;
+          
+          if (textChannel && 'send' in textChannel) {
+            const breakthroughEmbed = new EmbedBuilder()
+              .setTitle("⚡ REALM BREAKTHROUGH!")
+              .setDescription(`🌟 **${message.author.username}** has achieved a magnificent breakthrough!\n\n**New Realm**: ${newRealm}`)
+              .setColor(0xffaa00)
+              .addFields(
+                { name: "Previous Realm", value: user.realm || "Connate Realm", inline: true },
+                { name: "New Realm", value: newRealm, inline: true },
+                { name: "Level Reset", value: "1", inline: true }
+              )
+              .setThumbnail(message.author.displayAvatarURL())
+              .setTimestamp();
+
+            await textChannel.send({ embeds: [breakthroughEmbed] }).catch(console.error);
+          }
+        }
       } else {
         await storage.updateUser(user.id, { xp: newXp } as any);
       }
@@ -777,6 +838,9 @@ export class CultivationBot {
           break;
         case "admin":
           await this.handleAdminCommand(interaction);
+          break;
+        case "sect_announcement":
+          await this.handleSectAnnouncementCommand(interaction);
           break;
         default:
           await interaction.reply({
@@ -2002,6 +2066,54 @@ export class CultivationBot {
       console.error("Error in handleAdminAddMission:", error);
       await interaction.editReply({
         content: "Error adding mission.",
+      });
+    }
+  }
+
+  private async handleSectAnnouncementCommand(interaction: any) {
+    try {
+      const user = await storage.getUserByDiscordId(
+        interaction.user.id,
+        interaction.guild.id
+      );
+
+      // Only Supreme Sect Master can use this command
+      if (!user || !user.isSupremeSectMaster) {
+        await interaction.reply({
+          content: "❌ Only the Supreme Sect Master can use this command!",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply();
+      const title = interaction.options.getString("title");
+      const message = interaction.options.getString("message");
+
+      const channels = interaction.guild.channels.cache;
+      const textChannel = channels.find((c: any) => c.isTextBased() && !c.isDMBased()) as any;
+
+      if (textChannel && 'send' in textChannel) {
+        const announcementEmbed = new EmbedBuilder()
+          .setTitle(`📢 ${title}`)
+          .setDescription(message)
+          .setColor(0xff0000)
+          .setAuthor({ 
+            name: "Supreme Sect Master",
+            iconURL: interaction.user.displayAvatarURL()
+          })
+          .setTimestamp();
+
+        await textChannel.send({ embeds: [announcementEmbed] }).catch(console.error);
+      }
+
+      await interaction.editReply({
+        content: `✅ Announcement sent: **${title}**`,
+      });
+    } catch (error) {
+      console.error("Error in handleSectAnnouncementCommand:", error);
+      await interaction.editReply({
+        content: "Error sending announcement.",
       });
     }
   }
