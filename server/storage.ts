@@ -1,9 +1,9 @@
 import { 
-  users, bloodlines, factions, items, userItems, missions, userMissions, 
+  users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
   battles, activities, serverSettings,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
-  type Faction, type InsertFaction, type Item, type InsertItem,
-  type UserItem, type Mission, type InsertMission, type UserMission,
+  type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
+  type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
   type Battle, type InsertBattle, type Activity, type InsertActivity,
   type ServerSettings, type InsertServerSettings
 } from "@shared/schema";
@@ -31,6 +31,20 @@ export interface IStorage {
   updateFaction(id: number, updates: Partial<Faction>): Promise<Faction>;
   joinFaction(userId: number, factionId: number, rank?: string): Promise<User>;
   leaveFaction(userId: number): Promise<User>;
+  
+  // Clan operations
+  getClansByServer(serverId: string): Promise<Clan[]>;
+  getClanById(id: number): Promise<Clan | undefined>;
+  createClan(clan: InsertClan): Promise<Clan>;
+  updateClan(id: number, updates: Partial<Clan>): Promise<Clan>;
+  joinClan(userId: number, clanId: number, role?: string): Promise<User>;
+  leaveClan(userId: number): Promise<User>;
+  
+  // Token operations
+  getUserTokens(userId: number): Promise<Token[]>;
+  getTokensByType(userId: number, type: string): Promise<Token[]>;
+  giveToken(userId: number, type: string, quantity?: number): Promise<Token>;
+  useToken(tokenId: number): Promise<void>;
   
   // Item operations
   getItems(): Promise<Item[]>;
@@ -204,6 +218,97 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updatedUser;
+  }
+
+  async getClansByServer(serverId: string): Promise<Clan[]> {
+    return await db
+      .select()
+      .from(clans)
+      .where(eq(clans.serverId, serverId))
+      .orderBy(desc(clans.prestige));
+  }
+
+  async getClanById(id: number): Promise<Clan | undefined> {
+    const [clan] = await db.select().from(clans).where(eq(clans.id, id));
+    return clan || undefined;
+  }
+
+  async createClan(clan: InsertClan): Promise<Clan> {
+    const [newClan] = await db.insert(clans).values(clan).returning();
+    return newClan;
+  }
+
+  async updateClan(id: number, updates: Partial<Clan>): Promise<Clan> {
+    const [updatedClan] = await db
+      .update(clans)
+      .set(updates)
+      .where(eq(clans.id, id))
+      .returning();
+    return updatedClan;
+  }
+
+  async joinClan(userId: number, clanId: number, role = "Member"): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ clanId, clanRole: role })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    await db
+      .update(clans)
+      .set({ memberCount: sql`${clans.memberCount} + 1` })
+      .where(eq(clans.id, clanId));
+    
+    return updatedUser;
+  }
+
+  async leaveClan(userId: number): Promise<User> {
+    const user = await db.select().from(users).where(eq(users.id, userId));
+    if (user[0]?.clanId) {
+      await db
+        .update(clans)
+        .set({ memberCount: sql`${clans.memberCount} - 1` })
+        .where(eq(clans.id, user[0].clanId));
+    }
+    
+    const [updatedUser] = await db
+      .update(users)
+      .set({ clanId: null, clanRole: null })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    return updatedUser;
+  }
+
+  async getUserTokens(userId: number): Promise<Token[]> {
+    return await db
+      .select()
+      .from(tokens)
+      .where(eq(tokens.userId, userId))
+      .orderBy(desc(tokens.acquiredAt));
+  }
+
+  async getTokensByType(userId: number, type: string): Promise<Token[]> {
+    return await db
+      .select()
+      .from(tokens)
+      .where(and(eq(tokens.userId, userId), eq(tokens.type, type as any)))
+      .orderBy(desc(tokens.acquiredAt));
+  }
+
+  async giveToken(userId: number, type: string, quantity = 1): Promise<Token> {
+    const [newToken] = await db
+      .insert(tokens)
+      .values({ userId, type: type as any, quantity })
+      .returning();
+    return newToken;
+  }
+
+  async useToken(tokenId: number): Promise<void> {
+    await db
+      .update(tokens)
+      .set({ usedAt: new Date() })
+      .where(eq(tokens.id, tokenId));
   }
 
   async getItems(): Promise<Item[]> {

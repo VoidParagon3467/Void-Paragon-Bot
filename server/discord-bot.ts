@@ -9,7 +9,7 @@ import {
   ChannelType,
 } from "discord.js";
 import { storage } from "./storage";
-import { cultivationRealms } from "@shared/schema";
+import { cultivationRealms, rankHierarchy } from "@shared/schema";
 
 export class CultivationBot {
   private client: Client;
@@ -69,6 +69,9 @@ export class CultivationBot {
     
     // Random events every 4 hours
     setInterval(() => this.triggerRandomEvent(), 4 * 60 * 60 * 1000);
+    
+    // Meditation XP gain every 1 minute
+    setInterval(() => this.distributeMeditationXp(), 60 * 1000);
 
     // Also run these immediately on startup
     this.distributeDailyResources().catch(console.error);
@@ -78,7 +81,7 @@ export class CultivationBot {
 
   private async distributeDailyResources() {
     try {
-      console.log("📦 Distributing daily resources...");
+      console.log("📦 Distributing daily resources by rank...");
       const guilds = Array.from(this.client.guilds.cache.entries());
 
       for (const [serverId] of guilds) {
@@ -88,8 +91,10 @@ export class CultivationBot {
           // Skip supreme sect master - they already have infinite
           if (userRecord.isSupremeSectMaster) continue;
           
-          // ONLY Void Crystals as daily reward - not enough to buy expensive items in one day
-          const voidCrystalsReward = 10 * userRecord.level; // Much lower amount - requires accumulation
+          // Rank-based VC multiplier - ONLY Void Crystals as daily reward
+          const rankInfo = rankHierarchy[userRecord.rank as keyof typeof rankHierarchy] || rankHierarchy["Outer Disciple"];
+          const baseReward = 10 * userRecord.level;
+          const voidCrystalsReward = Math.floor(baseReward * rankInfo.multiplier);
           
           await storage.updateUser(userRecord.id, {
             voidCrystals: userRecord.voidCrystals + voidCrystalsReward,
@@ -103,11 +108,11 @@ export class CultivationBot {
           if (textChannel && 'send' in textChannel) {
             const embed = new EmbedBuilder()
               .setTitle("🌅 Daily Resources Distributed!")
-              .setDescription(`All cultivators have received their daily resources!`)
+              .setDescription(`All cultivators have received their daily resources based on rank!`)
               .setColor(0x00ff88)
               .addFields({
-                name: "Daily Rewards (Per Player)",
-                value: `💎 10 × Level Void Crystals\n\n⚠️ Spirit Points and Karma are earned only through events and treasures!\n✨ Save your VC to purchase treasures!`,
+                name: "Daily Rewards (Rank-Based VC Multiplier)",
+                value: `💎 Base: 10 × Level Void Crystals\n🏆 Multiplied by Rank (Outer Disciple: 1x, Heavenly Elder: 8x, Supreme Sect Master: 100x)\n\n⚠️ Sect Points and Karma are earned only through events and treasures!\n✨ Save your VC to purchase treasures!`,
               })
               .setTimestamp();
 
@@ -153,7 +158,7 @@ export class CultivationBot {
         const vcCost = 300 + Math.floor(Math.random() * 200);
         const spCost = 5 + Math.floor(Math.random() * 5);
         price = vcCost;
-        priceDescription = `${vcCost} VC + ${spCost} Spirit Points`;
+        priceDescription = `${vcCost} VC + ${spCost} Sect Points`;
       } else if (rarity === "epic") {
         const karmaCost = 2 + Math.floor(Math.random() * 2); // 2-3 Karma
         price = karmaCost * 1000; // Store karma cost as multiplier for DB compatibility
@@ -993,27 +998,31 @@ export class CultivationBot {
       await interaction.deferReply();
       const user = await this.getOrCreateUser(interaction);
 
-      const success = Math.random() > 0.3;
-      const xpGain = Math.floor(Math.random() * 50) + 50;
-
-      if (success) {
-        const newXp = user.xp + xpGain;
-        await storage.updateUser(user.id, { xp: newXp } as any);
+      if (user.isMeditating) {
+        // Stop meditation
+        await storage.updateUser(user.id, {
+          isMeditating: false,
+          meditationStartedAt: null,
+        } as any);
 
         const embed = new EmbedBuilder()
-          .setTitle("✨ Cultivation Success!")
-          .setDescription(
-            `You have successfully cultivated and gained ${xpGain} XP!`
-          )
-          .setColor(0x00ff88)
+          .setTitle("🧘 Meditation Ended")
+          .setDescription("You have exited your meditative state.")
+          .setColor(0xff8800)
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
       } else {
+        // Start meditation
+        await storage.updateUser(user.id, {
+          isMeditating: true,
+          meditationStartedAt: new Date(),
+        } as any);
+
         const embed = new EmbedBuilder()
-          .setTitle("⚠️ Cultivation Failed")
-          .setDescription("Your cultivation attempt was unsuccessful. Try again!")
-          .setColor(0xff8800)
+          .setTitle("🧘 Meditation Started")
+          .setDescription("You enter a deep meditative state...\n\nYou will slowly gain XP as long as you remain on Discord.")
+          .setColor(0x00ff88)
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
@@ -1021,8 +1030,30 @@ export class CultivationBot {
     } catch (error) {
       console.error("Error in handleCultivateCommand:", error);
       await interaction.editReply({
-        content: "Error during cultivation.",
+        content: "Error during meditation.",
       });
+    }
+  }
+
+  private async distributeMeditationXp() {
+    try {
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      for (const [serverId] of guilds) {
+        const users = await storage.getUsersInServer(serverId);
+        
+        for (const user of users) {
+          if (user.isMeditating && user.meditationStartedAt) {
+            // Very slow XP gain - 1-2 XP per minute
+            const xpGain = Math.floor(Math.random() * 2) + 1;
+            await storage.updateUser(user.id, {
+              xp: user.xp + xpGain,
+            } as any);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error distributing meditation XP:", error);
     }
   }
 

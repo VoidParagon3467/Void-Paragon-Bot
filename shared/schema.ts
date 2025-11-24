@@ -48,7 +48,7 @@ export const users = pgTable("users", {
   rank: text("rank").notNull().default("Outer Disciple"), // Named ranks as specified
   // Currency
   voidCrystals: integer("void_crystals").notNull().default(0),
-  sectPoints: integer("sect_points").notNull().default(0), // SP (Sect Points)
+  sectPoints: integer("spirit_points").notNull().default(0), // SP (Sect Points - displayed as "Sect Points" in UI)
   karma: integer("karma").notNull().default(0),
   fate: integer("fate").notNull().default(0), // Luck stat - affects battles, spars, airdrops, dangerous situations
   // Bloodline
@@ -66,6 +66,9 @@ export const users = pgTable("users", {
   isSupremeSectMaster: boolean("is_supreme_sect_master").notNull().default(false),
   // Rebirth
   rebirthCount: integer("rebirth_count").notNull().default(0),
+  // Meditation
+  isMeditating: boolean("is_meditating").notNull().default(false),
+  meditationStartedAt: timestamp("meditation_started_at"),
   // Meta
   createdAt: timestamp("created_at").defaultNow(),
   lastActive: timestamp("last_active").defaultNow(),
@@ -330,6 +333,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
   lastActive: true,
   lastDailyRewardAt: true,
+  meditationStartedAt: true,
 });
 
 export const insertBloodlineSchema = createInsertSchema(bloodlines).omit({
