@@ -10,12 +10,18 @@ import {
 } from "discord.js";
 import { storage } from "./storage";
 import { cultivationRealms, rankHierarchy } from "@shared/schema";
+import OpenAI from "openai";
+
+// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export class CultivationBot {
   private client: Client;
   private readonly TOKEN = process.env.DISCORD_TOKEN;
   private logThreadMap: Map<string, string> = new Map(); // Map of serverId to thread ID
   private activeEvents: Map<string, number> = new Map(); // Track count of simultaneous events per server (max 3)
+  private conversationHistories: Map<string, Array<{ role: string; content: string }>> = new Map(); // DM conversation histories
+  private activeGames: Map<string, any> = new Map(); // Track active games
 
   constructor() {
     this.client = new Client({
@@ -128,6 +134,13 @@ export class CultivationBot {
 
     this.client.on("messageCreate", async (message) => {
       if (message.author.bot) return;
+      
+      // Handle DM conversations with the bot
+      if (message.isDMChannel()) {
+        await this.handleDMConversation(message);
+        return;
+      }
+
       const logMsg = `💬 Message from ${message.author.tag}: "${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}"`;
       // Only log important messages, not all to avoid spam
       if (message.mentions.has(this.client.user?.id || '')) {
@@ -1213,6 +1226,23 @@ export class CultivationBot {
             .setName("cover_image")
             .setDescription("URL to chapter cover image (optional)")
             .setRequired(false)
+        ),
+
+      // Games - For organizing games in channels
+      new SlashCommandBuilder()
+        .setName("startgame")
+        .setDescription("Start a game in the channel")
+        .addStringOption((option) =>
+          option
+            .setName("game")
+            .setDescription("Game to play")
+            .setRequired(true)
+            .addChoices(
+              { name: "Trivia - Cultivation facts", value: "trivia" },
+              { name: "Guess Number (1-100)", value: "number" },
+              { name: "Riddle Challenge", value: "riddle" },
+              { name: "Fortune Telling", value: "fortune" }
+            )
         ),
     ];
 
@@ -2887,6 +2917,226 @@ export class CultivationBot {
       await interaction.editReply({
         content: "❌ Error posting chapter announcement.",
       });
+    }
+  }
+
+  // ====== DM CONVERSATION & GAMES ======
+
+  private async handleDMConversation(message: any) {
+    try {
+      const userId = message.author.id;
+      const userKey = `dm_${userId}`;
+
+      // Initialize conversation history if new
+      if (!this.conversationHistories.has(userKey)) {
+        this.conversationHistories.set(userKey, []);
+      }
+
+      const conversationHistory = this.conversationHistories.get(userKey) || [];
+
+      // Add user message to history
+      conversationHistory.push({
+        role: "user",
+        content: message.content,
+      });
+
+      // Build system prompt for Xianxia cultivation bot
+      const systemPrompt = `You are the Void Sect Bot, an intelligent cultivator companion in a Discord cultivation RPG server. You are friendly, knowledgeable about Xianxia and cultivation concepts, and can:
+1. Have casual conversations about cultivation, Xianxia novels, and the Void Sect
+2. Suggest games like trivia, riddles, fortune telling, and number guessing games
+3. Help users understand their cultivation progress and strategies
+4. Provide encouragement and lore-friendly advice
+Be conversational, use cultivation terminology naturally, and keep responses under 2000 characters. When users ask to play games, offer specific game options like "trivia", "riddle", "fortune_telling", or "number_game".`;
+
+      // Get AI response
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...conversationHistory,
+        ],
+        max_completion_tokens: 500,
+      });
+
+      const aiResponse = response.choices[0].message.content || "...";
+
+      // Add AI response to history
+      conversationHistory.push({
+        role: "assistant",
+        content: aiResponse,
+      });
+
+      // Keep only last 10 messages to avoid memory issues
+      if (conversationHistory.length > 20) {
+        conversationHistory.splice(0, 2);
+      }
+
+      // Detect if user wants to play a game
+      const lowerContent = message.content.toLowerCase();
+      let gameToStart = null;
+
+      if (lowerContent.includes("trivia") || lowerContent.includes("quiz")) {
+        gameToStart = "trivia";
+      } else if (lowerContent.includes("riddle") || lowerContent.includes("puzzle")) {
+        gameToStart = "riddle";
+      } else if (lowerContent.includes("fortune") || lowerContent.includes("tell")) {
+        gameToStart = "fortune";
+      } else if (lowerContent.includes("number") || lowerContent.includes("guess")) {
+        gameToStart = "number";
+      }
+
+      // Send AI response
+      if (aiResponse.length <= 2000) {
+        await message.reply(aiResponse).catch(console.error);
+      } else {
+        await message.reply(aiResponse.substring(0, 1997) + "...").catch(console.error);
+      }
+
+      // Start game if user wants
+      if (gameToStart) {
+        setTimeout(() => {
+          this.startGameInDM(message, gameToStart);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Error in DM conversation:", error);
+      await message.reply("Apologies, cultivator. My meditation was interrupted. Please try again.").catch(console.error);
+    }
+  }
+
+  private async startGameInDM(message: any, gameType: string) {
+    try {
+      const userId = message.author.id;
+      const gameKey = `${userId}_${gameType}`;
+
+      if (this.activeGames.has(gameKey)) {
+        await message.reply("Already playing a game, friend. Finish it first!").catch(console.error);
+        return;
+      }
+
+      switch (gameType) {
+        case "trivia":
+          await this.playTrivia(message, gameKey);
+          break;
+        case "riddle":
+          await this.playRiddle(message, gameKey);
+          break;
+        case "fortune":
+          await this.playFortuneTelling(message, gameKey);
+          break;
+        case "number":
+          await this.playNumberGame(message, gameKey);
+          break;
+      }
+    } catch (error) {
+      console.error("Error starting game:", error);
+    }
+  }
+
+  private async playTrivia(message: any, gameKey: string) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          {
+            role: "user",
+            content: "Generate ONE cultivation/Xianxia trivia question with 4 multiple choice answers (A, B, C, D). Format: QUESTION\\n\\nA) answer\\nB) answer\\nC) answer\\nD) answer\\n\\nCORRECT: [A/B/C/D]",
+          },
+        ],
+        max_completion_tokens: 300,
+      });
+
+      const triviaText = response.choices[0].message.content || "";
+      const correctAnswerMatch = triviaText.match(/CORRECT:\s*([A-D])/i);
+      const correctAnswer = correctAnswerMatch ? correctAnswerMatch[1].toUpperCase() : "A";
+
+      this.activeGames.set(gameKey, { type: "trivia", correct: correctAnswer, attempts: 0 });
+
+      await message.reply(
+        `🎓 **Cultivation Trivia Challenge!**\n\n${triviaText.replace(/CORRECT:.*$/gi, "").trim()}\n\nReply with A, B, C, or D!`
+      ).catch(console.error);
+    } catch (error) {
+      console.error("Error in trivia:", error);
+    }
+  }
+
+  private async playRiddle(message: any, gameKey: string) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          {
+            role: "user",
+            content: "Create ONE clever Xianxia-themed riddle with a SHORT answer (1-3 words max). Format: RIDDLE: [riddle here]\\n\\nANSWER: [answer]",
+          },
+        ],
+        max_completion_tokens: 200,
+      });
+
+      const riddleText = response.choices[0].message.content || "";
+      const answerMatch = riddleText.match(/ANSWER:\s*(.+?)(?:\n|$)/i);
+      const correctAnswer = answerMatch ? answerMatch[1].trim().toLowerCase() : "immortal";
+
+      this.activeGames.set(gameKey, { type: "riddle", correct: correctAnswer });
+
+      const riddleOnly = riddleText.replace(/ANSWER:.*$/gi, "").trim();
+      await message.reply(`🧩 **Riddle Challenge!**\n\n${riddleOnly}\n\nWhat is the answer? (Reply with your guess!)`).catch(console.error);
+    } catch (error) {
+      console.error("Error in riddle:", error);
+    }
+  }
+
+  private async playFortuneTelling(message: any, gameKey: string) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          {
+            role: "user",
+            content: `Generate a mystical Xianxia fortune telling for a Discord user named "${message.author.username}". Include: destiny prediction, cultivation advice, lucky realm/day, and mystical warning. Keep it under 300 characters. Make it fun and encouraging!`,
+          },
+        ],
+        max_completion_tokens: 200,
+      });
+
+      const fortune = response.choices[0].message.content || "Your path is shrouded in destiny...";
+
+      this.activeGames.set(gameKey, { type: "fortune", completed: true });
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🔮 Your Cultivation Fortune, ${message.author.username}`)
+        .setDescription(fortune)
+        .setColor(0x9966ff)
+        .setFooter({ text: "May your cultivation reach the heavens!" })
+        .setTimestamp();
+
+      await message.reply({ embeds: [embed] }).catch(console.error);
+
+      setTimeout(() => this.activeGames.delete(gameKey), 5000);
+    } catch (error) {
+      console.error("Error in fortune telling:", error);
+    }
+  }
+
+  private async playNumberGame(message: any, gameKey: string) {
+    try {
+      const secretNumber = Math.floor(Math.random() * 100) + 1;
+
+      this.activeGames.set(gameKey, {
+        type: "number",
+        secret: secretNumber,
+        attempts: 0,
+        maxAttempts: 7,
+      });
+
+      await message.reply(
+        `🎯 **Number Guessing Game!**\n\nI'm thinking of a number between 1 and 100. You have 7 attempts to guess it!\n\nGood luck, cultivator! 🍀`
+      ).catch(console.error);
+
+      // Store game for answer checking in message handler
+      // We'll check when user replies in their next message
+    } catch (error) {
+      console.error("Error in number game:", error);
     }
   }
 

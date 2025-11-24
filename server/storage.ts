@@ -1,6 +1,6 @@
 import { 
   users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
-  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases,
+  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases, userStrikes,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
   type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
   type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
@@ -118,6 +118,10 @@ export interface IStorage {
   // Server settings
   getServerSettings(serverId: string): Promise<ServerSettings | undefined>;
   updateServerSettings(serverId: string, updates: Partial<ServerSettings>): Promise<ServerSettings>;
+  
+  // Moderation strikes
+  getUserStrikes(userId: number): Promise<any[]>;
+  recordStrike(userId: number, strikeCount: number, reason: string, description: string, serverId: string, bannedUntil?: Date): Promise<any>;
   
   // Statistics
   getServerStats(serverId: string): Promise<{
@@ -693,6 +697,30 @@ export class DatabaseStorage implements IStorage {
       totalBattles: battleStats?.totalBattles || 0,
       averageLevel: userStats?.averageLevel || 0,
     };
+  }
+
+  async getUserStrikes(userId: number): Promise<any[]> {
+    return await db
+      .select()
+      .from(userStrikes)
+      .where(eq(userStrikes.userId, userId))
+      .orderBy(desc(userStrikes.issuedAt));
+  }
+
+  async recordStrike(userId: number, strikeCount: number, reason: string, description: string, serverId: string, bannedUntil?: Date): Promise<any> {
+    const [strike] = await db
+      .insert(userStrikes)
+      .values({
+        userId,
+        strikeCount,
+        reason,
+        description,
+        serverId,
+        bannedUntil: bannedUntil || null,
+        issuedAt: new Date(),
+      })
+      .returning();
+    return strike;
   }
 }
 

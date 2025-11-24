@@ -4,7 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-  "start": "ts-node server/discord-bot.ts",
+    "start": "ts-node server/discord-bot.ts",
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "prod": "NODE_ENV=production node dist/index.js",
@@ -63,6 +63,7 @@
     "memorystore": "^1.6.7",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
+    "openai": "^6.9.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "react": "^18.3.1",
