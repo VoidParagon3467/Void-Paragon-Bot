@@ -694,11 +694,23 @@ export class CultivationBot {
         member.guild.id
       );
       if (!user) {
+        const isSupremeSectMaster = member.user.id === "1344237246240391272";
         await storage.createUser({
           discordId: member.user.id,
           username: member.user.username,
           avatar: member.user.displayAvatarURL(),
           serverId: member.guild.id,
+          isSupremeSectMaster,
+          ...(isSupremeSectMaster && {
+            rank: "Supreme Sect Master",
+            realm: "True God Realm",
+            level: 9,
+            xp: 999999,
+            voidCrystals: 999999999,
+            spiritPoints: 999999,
+            karma: 999999,
+            fate: 999999,
+          }),
         } as any);
       }
 
@@ -894,6 +906,7 @@ export class CultivationBot {
           isSupremeSectMaster,
           // Grant infinite resources to supreme sect master
           ...(isSupremeSectMaster && {
+            rank: "Supreme Sect Master",
             realm: "True God Realm",
             level: 9,
             xp: 999999,
@@ -907,6 +920,7 @@ export class CultivationBot {
         // Update existing user to supreme sect master status
         user = (await storage.updateUser(user.id, {
           isSupremeSectMaster: true,
+          rank: "Supreme Sect Master",
           realm: "True God Realm",
           level: 9,
           xp: 999999,
