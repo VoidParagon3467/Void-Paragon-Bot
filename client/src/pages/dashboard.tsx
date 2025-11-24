@@ -1,29 +1,57 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { 
   Crown, Zap, Users, Shield, Flame, Gem, Award, TrendingUp, 
-  Settings, Eye, Lock, Unlock, ChevronRight, AlertCircle 
+  Settings, Eye, Unlock, ChevronRight, AlertCircle, Lock
 } from "lucide-react";
 import { Link } from "wouter";
+
+interface User {
+  id: string;
+  discordId: string;
+  serverId: string;
+  username: string;
+  rank: string;
+  realm: string;
+  level: number;
+  xp: number;
+  power: number;
+  defense: number;
+  agility: number;
+  wisdom: number;
+  voidCrystals: number;
+  sectPoints: number;
+  factionId?: string | null;
+  factionName?: string;
+  factionRank?: string;
+  clanId?: string | null;
+  clanName?: string;
+  clanRole?: string;
+  isSupremeSectMaster?: boolean;
+}
+
+interface ServerSettings {
+  sectMasterId: string;
+}
 
 const MOCK_USER = {
   discordId: "123456789",
   serverId: "987654321"
 };
 
-const rankHierarchy = {
+const rankHierarchy: Record<string, { level: number; multiplier: number; permissions: string[] }> = {
   "Supreme Sect Master": { level: 15, multiplier: 100, permissions: ["all"] },
-  "Heavenly Elder": { level: 14, multiplier: 8, permissions: ["events", "moderation", "shop", "treasury"] },
-  "Great Elder": { level: 13, multiplier: 6, permissions: ["events", "moderation", "treasury"] },
+  "Heavenly Elder": { level: 14, multiplier: 8, permissions: ["events", "moderation", "shop", "treasury", "clan_creation"] },
+  "Great Elder": { level: 13, multiplier: 6, permissions: ["events", "moderation", "treasury", "clan_creation"] },
   "Elder": { level: 12, multiplier: 4, permissions: ["moderation", "treasury"] },
   "Core Disciple": { level: 11, multiplier: 3, permissions: ["treasury"] },
-  "Inheritor Disciple": { level: 9, multiplier: 1.5, permissions: ["spar", "clan"] },
-  "Guardian": { level: 10, multiplier: 2, permissions: ["treasury"] },
-  "Inner Disciple": { level: 10, multiplier: 2, permissions: ["spar"] },
-  "Outer Disciple": { level: 1, multiplier: 1, permissions: ["spar"] },
+  "Inheritor Disciple": { level: 9, multiplier: 1.5, permissions: ["faction_creation"] },
+  "Guardian": { level: 10, multiplier: 2, permissions: [] },
+  "Inner Disciple": { level: 8, multiplier: 1.2, permissions: [] },
+  "Outer Disciple": { level: 1, multiplier: 1, permissions: [] },
 };
 
 const rankProgression = [
@@ -38,12 +66,12 @@ const rankProgression = [
 ];
 
 export default function Dashboard() {
-  const { data: user, isLoading: userLoading } = useQuery({
+  const { data: user, isLoading: userLoading } = useQuery<User | null>({
     queryKey: [`/api/user/${MOCK_USER.discordId}/${MOCK_USER.serverId}`],
     retry: false,
   });
 
-  const { data: serverSettings } = useQuery({
+  const { data: serverSettings } = useQuery<ServerSettings | null>({
     queryKey: [`/api/server-settings/${MOCK_USER.serverId}`],
     retry: false,
   });
@@ -52,20 +80,21 @@ export default function Dashboard() {
   const userRank = user?.rank || "Outer Disciple";
   const rankInfo = rankHierarchy[userRank as keyof typeof rankHierarchy] || rankHierarchy["Outer Disciple"];
   
-  // Find next rank
   const currentRankIndex = rankProgression.indexOf(userRank);
   const nextRankIndex = Math.min(currentRankIndex + 1, rankProgression.length - 1);
   const nextRank = rankProgression[nextRankIndex];
   const nextRankInfo = rankHierarchy[nextRank as keyof typeof rankHierarchy];
 
-  // Calculate progression
-  const nextLevelXp = Math.floor(user?.level * 100 * (1.5 ** user?.level)) || 1000;
-  const xpProgress = Math.min((user?.xp / nextLevelXp) * 100, 100);
+  const nextLevelXp = Math.floor((user?.level || 1) * 100 * (1.5 ** (user?.level || 1))) || 1000;
+  const xpProgress = Math.min(((user?.xp || 0) / nextLevelXp) * 100, 100);
 
   const hasPermission = (permission: string) => {
     if (isSectMaster) return true;
     return rankInfo.permissions.includes(permission);
   };
+
+  const canCreateFaction = rankInfo.level >= 9;
+  const canCreateClan = rankInfo.level >= 13;
 
   if (userLoading) {
     return (
@@ -121,20 +150,18 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         
-        {/* SECTION 1: HERO PROFILE */}
+        {/* HERO PROFILE */}
         <div className="relative group">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300" />
           <Card className="relative border-purple-500/30 bg-slate-900/50 backdrop-blur-sm overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl -mr-20 -mt-20" />
             <CardContent className="p-8 relative z-10">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {/* Profile Info */}
                 <div className="md:col-span-2">
                   <h2 className="text-4xl font-bold text-white mb-1">{user.username}</h2>
                   <p className="text-purple-300 text-lg mb-4">{user.realm} • Level {user.level}</p>
                   
                   <div className="space-y-4">
-                    {/* XP Progress */}
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-slate-400">Cultivation Progress</span>
@@ -143,29 +170,27 @@ export default function Dashboard() {
                       <Progress value={xpProgress} className="h-2" />
                     </div>
 
-                    {/* Core Stats */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Power</p>
-                        <p className="text-lg font-bold text-green-400">{user.power || 0}</p>
+                        <p className="text-lg font-bold text-green-400">{user.power}</p>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Defense</p>
-                        <p className="text-lg font-bold text-blue-400">{user.defense || 0}</p>
+                        <p className="text-lg font-bold text-blue-400">{user.defense}</p>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Agility</p>
-                        <p className="text-lg font-bold text-yellow-400">{user.agility || 0}</p>
+                        <p className="text-lg font-bold text-yellow-400">{user.agility}</p>
                       </div>
                       <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
                         <p className="text-slate-400 text-xs mb-1">Wisdom</p>
-                        <p className="text-lg font-bold text-purple-400">{user.wisdom || 0}</p>
+                        <p className="text-lg font-bold text-purple-400">{user.wisdom}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Rank Progression Card */}
                 <div className="space-y-4">
                   <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-lg p-4">
                     <p className="text-slate-400 text-sm mb-3">Current Rank</p>
@@ -197,7 +222,6 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* Currencies */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/30 rounded-lg p-3">
                       <p className="text-slate-400 text-xs mb-1">Void Crystals</p>
@@ -214,7 +238,7 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* SECTION 2: QUICK ACTIONS */}
+        {/* QUICK ACTIONS - EVERYONE */}
         <div>
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Zap className="w-5 h-5 text-purple-400" /> Quick Access
@@ -252,47 +276,53 @@ export default function Dashboard() {
               </Card>
             </Link>
 
-            {/* Spar - available to Inheritor Disciples+ */}
-            {(hasPermission("spar") || rankInfo.level >= 9) && (
-              <Link href="/spar" data-testid="link-spar">
-                <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-lg group-hover:from-red-500/30 group-hover:to-red-600/20">
-                        <Flame className="w-5 h-5 text-red-400" />
-                      </div>
-                      <div>
-                        <p className="text-white font-semibold text-sm">Spar</p>
-                        <p className="text-slate-400 text-xs">Battle others</p>
-                      </div>
+            {/* SPAR - AVAILABLE TO EVERYONE */}
+            <Link href="/spar" data-testid="link-spar">
+              <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-red-500/20 to-red-600/10 rounded-lg group-hover:from-red-500/30 group-hover:to-red-600/20">
+                      <Flame className="w-5 h-5 text-red-400" />
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            )}
+                    <div>
+                      <p className="text-white font-semibold text-sm">Spar</p>
+                      <p className="text-slate-400 text-xs">Battle others</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            {/* Shop - available to Core Disciples+ */}
-            {(hasPermission("shop") || rankInfo.level >= 11) && (
-              <Link href="/shop" data-testid="link-shop">
-                <Card className="border-slate-700/50 bg-slate-900/50 hover:bg-slate-900/70 cursor-pointer transition-all h-full group">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 rounded-lg group-hover:from-yellow-500/30 group-hover:to-yellow-600/20">
-                        <Gem className="w-5 h-5 text-yellow-400" />
-                      </div>
-                      <div>
-                        <p className="text-white font-semibold text-sm">Shop</p>
-                        <p className="text-slate-400 text-xs">Buy items</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            )}
+            {/* SHOP - LIMITED FOR LOW RANKS */}
+            <Card className={`border-yellow-700/50 cursor-pointer transition-all h-full group ${
+              hasPermission("shop") ? "bg-slate-900/50 hover:bg-slate-900/70" : "bg-slate-900/30 opacity-60"
+            }`} data-testid="card-shop">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    hasPermission("shop") 
+                      ? "bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 group-hover:from-yellow-500/30 group-hover:to-yellow-600/20"
+                      : "bg-slate-700/30"
+                  }`}>
+                    {hasPermission("shop") ? (
+                      <Gem className="w-5 h-5 text-yellow-400" />
+                    ) : (
+                      <Lock className="w-5 h-5 text-slate-400" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">Shop</p>
+                    <p className="text-slate-400 text-xs">
+                      {hasPermission("shop") ? "Buy items" : "Unlock at Core Disciple"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* SECTION 3: ACTIVE EVENTS - AVAILABLE TO EVERYONE */}
+        {/* ACTIVE EVENTS - EVERYONE */}
         <div>
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-blue-400" /> Active Events
@@ -327,7 +357,6 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Event Management - Only for those with permission */}
           {hasPermission("events") && (
             <div className="mt-4">
               <Button size="sm" variant="outline" data-testid="button-create-event" className="w-full">
@@ -337,10 +366,115 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* SECTION 4: ROLE-SPECIFIC FEATURES */}
+        {/* FACTION & CLAN - EVERYONE CAN JOIN */}
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-purple-400" /> Organizations
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* FACTION */}
+            {user.factionId ? (
+              <Card className="border-purple-500/30 bg-slate-900/50">
+                <CardContent className="p-4">
+                  <p className="text-slate-400 text-xs mb-2">FACTION</p>
+                  <p className="text-white font-bold mb-2">{user.factionName}</p>
+                  <p className="text-slate-400 text-sm mb-3">Role: {user.factionRank}</p>
+                  <Button size="sm" variant="outline" data-testid="button-faction-details">View Faction</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className={`border-purple-700/50 ${canCreateFaction ? "bg-slate-900/50" : "bg-slate-900/30 opacity-60"}`}>
+                <CardContent className="p-4">
+                  <p className="text-slate-400 text-xs mb-2">CREATE FACTION</p>
+                  {canCreateFaction ? (
+                    <>
+                      <p className="text-purple-300 font-semibold text-sm mb-2">Build Your Faction</p>
+                      <p className="text-slate-400 text-xs mb-3">Requires: Faction Token (VC + SP)</p>
+                      <Button size="sm" data-testid="button-create-faction">Create Faction</Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-slate-400 font-semibold text-sm mb-2">Locked</p>
+                      <p className="text-slate-500 text-xs">Requires: Inheritor Disciple Rank</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* CLAN */}
+            {user.clanId ? (
+              <Card className="border-orange-500/30 bg-slate-900/50">
+                <CardContent className="p-4">
+                  <p className="text-slate-400 text-xs mb-2">CLAN</p>
+                  <p className="text-white font-bold mb-2">{user.clanName}</p>
+                  <p className="text-slate-400 text-sm mb-3">Position: {user.clanRole}</p>
+                  <Button size="sm" variant="outline" data-testid="button-clan-details">View Clan</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className={`border-orange-700/50 ${canCreateClan ? "bg-slate-900/50" : "bg-slate-900/30 opacity-60"}`}>
+                <CardContent className="p-4">
+                  <p className="text-slate-400 text-xs mb-2">CREATE CLAN</p>
+                  {canCreateClan ? (
+                    <>
+                      <p className="text-orange-300 font-semibold text-sm mb-2">Establish Your Clan</p>
+                      <p className="text-slate-400 text-xs mb-3">Requires: Clan Token (SP + Karma)</p>
+                      <Button size="sm" data-testid="button-create-clan">Create Clan</Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-slate-400 font-semibold text-sm mb-2">Locked</p>
+                      <p className="text-slate-500 text-xs">Requires: Great Elder+ Rank</p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {(user.factionId || user.clanId) && (
+            <p className="text-xs text-slate-400 mt-3">
+              💡 Purchase faction/clan leaving tokens to switch organizations (expensive!)
+            </p>
+          )}
+        </div>
+
+        {/* PREMIUM FEATURES - LIMITED FOR LOW RANKS */}
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Award className="w-5 h-5 text-yellow-400" /> Premium Features
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {["Treasures", "Bloodlines", "Divine Bodies", "Custom Titles", "Card Personalization", "Cosmetics"].map((feature) => (
+              <Card 
+                key={feature}
+                className={`border-yellow-700/50 ${
+                  rankInfo.level > 2 ? "bg-slate-900/50" : "bg-slate-900/30 opacity-60"
+                }`}
+                data-testid={`card-premium-${feature.toLowerCase()}`}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <p className="text-white font-semibold text-sm">{feature}</p>
+                    {rankInfo.level <= 2 && <Lock className="w-4 h-4 text-slate-400" />}
+                  </div>
+                  <p className="text-slate-400 text-xs mb-3">
+                    {rankInfo.level > 2 ? "Available for your rank" : "Limited for Outer/Inner Disciples"}
+                  </p>
+                  <Button size="sm" variant="outline" data-testid={`button-${feature.toLowerCase()}`} disabled={rankInfo.level <= 2}>
+                    View
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* ROLE-SPECIFIC FEATURES */}
         <div className="space-y-8">
           
-          {/* Treasury - Available to Core Disciples+ */}
+          {/* TREASURY */}
           {hasPermission("treasury") && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -365,7 +499,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Moderation - Available to Elders+ */}
+          {/* MODERATION */}
           {hasPermission("moderation") && (
             <div>
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -392,8 +526,7 @@ export default function Dashboard() {
             </div>
           )}
 
-
-          {/* Supreme Master Controls */}
+          {/* SUPREME MASTER */}
           {isSectMaster && (
             <div className="border-l-4 border-red-500 bg-gradient-to-r from-red-500/10 to-transparent p-6 rounded-lg">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -454,38 +587,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* SECTION 4: FACTION & CLAN STATUS */}
-        {(user.factionId || user.clanId) && (
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-purple-400" /> Organizations
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {user.factionId && (
-                <Card className="border-slate-700/50 bg-slate-900/50">
-                  <CardContent className="p-4">
-                    <p className="text-slate-400 text-xs mb-2">FACTION</p>
-                    <p className="text-white font-bold mb-2">{user.factionName || "Unknown Faction"}</p>
-                    <p className="text-slate-400 text-sm mb-3">Role: {user.factionRank}</p>
-                    <Button size="sm" variant="outline" data-testid="button-faction-details">View Faction</Button>
-                  </CardContent>
-                </Card>
-              )}
-              {user.clanId && (
-                <Card className="border-slate-700/50 bg-slate-900/50">
-                  <CardContent className="p-4">
-                    <p className="text-slate-400 text-xs mb-2">CLAN</p>
-                    <p className="text-white font-bold mb-2">{user.clanName || "Unknown Clan"}</p>
-                    <p className="text-slate-400 text-sm mb-3">Position: {user.clanRole}</p>
-                    <Button size="sm" variant="outline" data-testid="button-clan-details">View Clan</Button>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* SECTION 5: PERMISSION GUIDE */}
+        {/* RANK GUIDE */}
         <div>
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Unlock className="w-5 h-5 text-slate-400" /> Rank Permissions Guide
@@ -502,6 +604,7 @@ export default function Dashboard() {
                       ? "bg-gradient-to-r from-purple-500/20 to-purple-600/10 border-purple-500/50"
                       : "bg-slate-900/50 border-slate-700/50"
                   }`}
+                  data-testid={`rank-guide-${rank.toLowerCase()}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -510,7 +613,7 @@ export default function Dashboard() {
                         <p className={`font-semibold text-sm ${isCurrentRank ? "text-white" : "text-slate-300"}`}>
                           {rank}
                         </p>
-                        <p className="text-xs text-slate-400">{info.permissions.join(", ") || "Basic access"}</p>
+                        <p className="text-xs text-slate-400">{info.permissions.length > 0 ? info.permissions.join(", ") : "Basic access"}</p>
                       </div>
                     </div>
                     <span className="text-slate-400 text-xs">{info.multiplier}x VC</span>

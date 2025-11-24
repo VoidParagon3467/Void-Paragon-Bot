@@ -14,6 +14,7 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **State Management**: TanStack Query for server state management
 - **Routing**: Wouter for lightweight client-side routing
 - **Real-time Updates**: WebSocket integration for live data synchronization
+- **Dashboard**: Hierarchical role-based permission system with 8 rank tiers
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js framework
@@ -33,14 +34,34 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 
 ## Key Components
 
-### ⭐ AI & Conversational System (NEW)
+### 👑 Hierarchical Role-Based Dashboard (NEW - COMPLETE)
+- **8 Rank Tiers**: Outer Disciple → Inner Disciple → Inheritor Disciple → Core Disciple → Elder → Great Elder → Heavenly Elder → Supreme Sect Master
+- **Supreme Sect Master**: Full admin panel, member management, rank promotions, treasury control, emergency controls
+- **Heavenly Elder**: Event management, moderation, shop access, treasury management, clan creation tokens
+- **Great Elder**: Event management, moderation, treasury management, clan creation tokens
+- **Elder**: Moderation panel, strike system, ban list, treasury access
+- **Core Disciple**: Treasury access only
+- **Inheritor Disciple+**: Faction creation with tokens (VC + SP)
+- **Everyone**: Events, Spars, missions, inventory access
+- **Permission-Based UI**: Features show as locked/restricted based on user rank (not hidden)
+- **Rank Progression**: Shows current rank multipliers, next rank requirements, and benefits
+- **Premium Features**: Treasures, bloodlines, divine bodies, custom titles, card personalization (limited for Outer/Inner Disciples, not removed)
+
+### Organization System
+- **Faction Creation**: Available to Inheritor Disciples with faction token (VC + SP cost)
+- **Clan Creation**: Available to Great Elder/Heavenly Elder with clan token (SP + Karma cost - expensive)
+- **Membership**: Each disciple can join 1 faction + 1 clan maximum
+- **Leaving**: Requires expensive faction/clan leaving tokens (purchasable currency)
+- **Status**: All users see faction/clan status cards on dashboard
+
+### ⭐ AI & Conversational System
 - **DM Chat**: Users can message the bot privately for intelligent Xianxia-themed conversations
 - **Conversation Memory**: Bot maintains conversation history per user (last 20 messages)
 - **Game Suggestions**: AI can suggest and facilitate games during chats
 - **Model**: OpenAI GPT-5 (optional - degrades gracefully without API key)
 - **Graceful Fallback**: Bot works with basic games if OpenAI key not provided
 
-### 🎮 Interactive Games System (NEW)
+### 🎮 Interactive Games System
 - **Trivia**: AI-generated cultivation/Xianxia trivia questions (or pre-loaded if no AI)
 - **Riddles**: Xianxia-themed riddle challenges with answers
 - **Fortune Telling**: Mystical fortune predictions with cultivation advice
@@ -60,7 +81,7 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **Permissions**: Role-based access control with Sect Master privileges
 - **Auto-responses**: Automated cultivation progression notifications
 
-### 🛡️ Advanced Moderation System (NEW - 3-Strike System)
+### 🛡️ Advanced Moderation System (3-Strike System)
 - **Strike 1**: Warning with violation details
 - **Strike 2**: 24-hour temporary ban from bot
 - **Strike 3**: Permanent expulsion from sect
@@ -68,7 +89,7 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **Elder Immunity**: Elders and moderators are immune from strikes
 - **Admin Logging**: All strikes logged to bot logs channel
 
-### 🌀 Void Sect Defense Event System (NEW)
+### 🌀 Void Sect Defense Event System
 - **Alien Invasions**: Server-wide events where aliens attack the sect
 - **Max 3 Simultaneous**: Prevents server overload (max 3 events per server)
 - **Defender Participation**: Disciples/Elders Spirit Realm+ must defend
@@ -76,13 +97,13 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **Defeat Penalties**: Lose Void Crystals, XP loss possible
 - **Frequency**: Triggers every 6 hours with 30-second defense window
 
-### 📊 Daily Activity Reporting System (NEW)
+### 📊 Daily Activity Reporting System
 - **Daily Reports**: Logged to bot logs channel (visible to Sect Master only)
 - **Metrics Tracked**: Total members, disciple count, elder count, top users
 - **Frequency**: Every 24 hours at server startup
 - **Purpose**: Monitor server activity and engagement trends
 
-### 💬 Conversation Topic Generation (NEW)
+### 💬 Conversation Topic Generation
 - **Silent Channel Detection**: Monitors for inactive channels
 - **Smart Generation**: Xianxia-themed conversation starters
 - **Non-Spam**: Only triggers when 2+ user messages missing in last 10 messages
@@ -96,7 +117,7 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **Auto-generation**: Dynamic mission creation based on player activity
 
 ### Battle System
-- **PvP Combat**: Player vs player sparring and dueling
+- **PvP Combat**: Player vs player sparring and dueling (OPEN TO EVERYONE)
 - **Faction Wars**: Large-scale faction-based battles
 - **Battle Results**: Win/loss tracking with ranking implications
 - **Real-time Updates**: Live battle notifications and leaderboard updates
@@ -105,7 +126,7 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **Item Types**: Weapons, armor, consumables, treasures, and skills
 - **Rarity System**: Common to Mythical rarity tiers
 - **Equipment**: Item equipping and stat bonuses
-- **Shop System**: Virtual currency-based item purchasing
+- **Shop System**: Virtual currency-based item purchasing (available to Core Disciples+)
 
 ## Data Flow
 
@@ -113,7 +134,7 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 1. Discord OAuth integration (to be implemented)
 2. Session management via PostgreSQL store
 3. User data synchronization between Discord and database
-4. Permission validation for admin features
+4. Permission validation for dashboard features
 
 ### Real-time Updates
 1. WebSocket connection establishment on client connection
@@ -169,7 +190,6 @@ This is a **half-AI Discord bot** for a cultivation/progression RPG system. The 
 - **Static Assets**: Served from dist/public directory
 - **Process Management**: Single Node.js process with Express serving both API and static files
 - **Database Migrations**: Drizzle push for schema updates
-- **Render.com Deployment**: Free tier with 30-60s cold starts
 
 ### Environment Configuration
 - **DATABASE_URL**: PostgreSQL connection string (Neon)
@@ -203,6 +223,17 @@ Changelog:
     - Implemented conversation topic generation for silent channels
     - Added userStrikes and dailyActivityLogs database tables
     - Bot gracefully degrades without OpenAI key (basic games available)
+  * NEW DASHBOARD OVERHAUL - COMPLETE ROLE-BASED PERMISSION SYSTEM
+    - Built 8-tier hierarchical rank system with permission-based UI
+    - Supreme Sect Master: Full admin controls
+    - Heavenly/Great Elder: Event & clan management
+    - Elder: Moderation & treasury access
+    - Core Disciple: Treasury access
+    - Inheritor Disciple: Faction creation with tokens
+    - Everyone: Events, Spars, missions, inventory
+    - Premium features shown as limited (not hidden) for low ranks
+    - Organization system: Factions (Inheritor+) & Clans (Great Elder+) with leaving tokens
+    - All features properly typed with TypeScript interfaces
 ```
 
 ## User Preferences
@@ -215,15 +246,18 @@ User exhausted with repetitive operational tasks.
 
 ## Features Summary
 
+- **8 Rank Tiers**: Comprehensive hierarchical permission system
 - **26 Cultivation Realms**: Progression from Connate to True God
 - **25 Discord Commands**: Comprehensive gameplay and admin features
 - **Real-time Systems**: WebSocket updates, auto-generation, daily rewards
 - **Moderation**: 3-strike system with role-based immunity
-- **Events**: Void Sect Defense with max 3 simultaneous, other random events
+- **Events**: Void Sect Defense with max 3 simultaneous, everyone can join
 - **Leaderboards**: Hall of Fame (disciples/elders separated)
 - **Novels**: Jadescrolls integration with chapter posting
 - **Premium**: Tiered cosmetic items with pricing
-- **AI Chat**: GPT-5 powered DM conversations (optional)
+- **AI Chat**: GPT-5 powered DM conversations (optional, with graceful fallback)
 - **Games**: Trivia, riddles, fortune telling, number guessing
+- **Organizations**: Factions & Clans with creation/leaving tokens
 - **Database**: Full Drizzle ORM with Neon PostgreSQL
 - **WebSockets**: Real-time data sync between client and server
+- **Dashboard**: Professional role-based control center with 8 ranks
