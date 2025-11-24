@@ -32,6 +32,7 @@ export class CultivationBot {
   private setupEventHandlers() {
     this.client.on("ready", () => {
       console.log(`✅ Bot is ready! Logged in as ${this.client.user?.tag}`);
+      this.startAutomaticSystems();
     });
 
     this.client.on("guildMemberAdd", async (member) => {
@@ -52,6 +53,292 @@ export class CultivationBot {
     this.client.on("error", (error) => {
       console.error("❌ Discord client error:", error);
     });
+  }
+
+  private startAutomaticSystems() {
+    console.log("🔄 Starting automatic systems...");
+    
+    // Daily resources distribution - every 24 hours
+    setInterval(() => this.distributeDailyResources(), 24 * 60 * 60 * 1000);
+    
+    // Auto-generate treasures every 6 hours
+    setInterval(() => this.autoGenerateTreasures(), 6 * 60 * 60 * 1000);
+    
+    // Bloodline generation for premium users every 12 hours
+    setInterval(() => this.autoGenerateBloodlines(), 12 * 60 * 60 * 1000);
+    
+    // Random events every 4 hours
+    setInterval(() => this.triggerRandomEvent(), 4 * 60 * 60 * 1000);
+
+    // Also run these immediately on startup
+    this.distributeDailyResources().catch(console.error);
+    this.autoGenerateTreasures().catch(console.error);
+    this.autoGenerateBloodlines().catch(console.error);
+  }
+
+  private async distributeDailyResources() {
+    try {
+      console.log("📦 Distributing daily resources...");
+      const guilds = Array.from(this.client.guilds.cache.entries());
+
+      for (const [serverId] of guilds) {
+        const users = await storage.getUsersInServer(serverId);
+
+        for (const user of users) {
+          const resourcesPerLevel = 50 * user.level;
+          await storage.updateUser(user.id, {
+            voidCrystals: user.voidCrystals + resourcesPerLevel,
+            spiritPoints: user.spiritPoints + resourcesPerLevel * 0.5,
+            karma: user.karma + 10,
+          } as any);
+        }
+
+        // Announce in general or first text channel
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (channels) {
+          const textChannel = channels.find((c: any) => c.isTextBased()) as any;
+          if (textChannel && 'send' in textChannel) {
+            const embed = new EmbedBuilder()
+              .setTitle("🌅 Daily Resources Distributed!")
+              .setDescription(`All cultivators have received their daily resources!`)
+              .setColor(0x00ff88)
+              .addFields({
+                name: "Rewards",
+                value: `💎 50 × Level Void Crystals\n✨ 25 × Level Spirit Points\n⭐ 10 Karma`,
+              })
+              .setTimestamp();
+
+            await (textChannel as any).send({ embeds: [embed] }).catch(console.error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error distributing daily resources:", error);
+    }
+  }
+
+  private async autoGenerateTreasures() {
+    try {
+      console.log("✨ Auto-generating treasures...");
+      const rarities = ["common", "uncommon", "rare", "epic", "legendary"];
+      const treasureNames = [
+        "Spirit Stone",
+        "Heaven Pill",
+        "Void Shard",
+        "Dragon Scale",
+        "Phoenix Feather",
+        "Celestial Pearl",
+        "Demon Blood",
+        "God Core",
+        "Infinite Jade",
+        "Soul Essence",
+      ];
+
+      // Generate 3-5 random treasures
+      const count = Math.floor(Math.random() * 3) + 3;
+      const generatedTreasures = [];
+
+      for (let i = 0; i < count; i++) {
+        const rarity = rarities[Math.floor(Math.random() * rarities.length)];
+        const name = treasureNames[Math.floor(Math.random() * treasureNames.length)];
+        const priceMultiplier = { common: 100, uncommon: 250, rare: 500, epic: 1500, legendary: 5000 };
+        const price = priceMultiplier[rarity as keyof typeof priceMultiplier] || 100;
+
+        const item = await storage.createItem({
+          name: `${name} (${rarity})`,
+          type: "treasure",
+          rarity,
+          description: `A rare treasure from the void`,
+          price,
+          powerBonus: Math.floor(Math.random() * 50) + 10,
+          defenseBonus: Math.floor(Math.random() * 30) + 5,
+          agilityBonus: Math.floor(Math.random() * 20) + 5,
+          wisdomBonus: Math.floor(Math.random() * 25) + 5,
+        } as any);
+
+        generatedTreasures.push(item);
+      }
+
+      // Announce rare treasures in all servers
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      for (const [serverId] of guilds) {
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (channels) {
+          // Find announcement or general channel
+          let targetChannel = channels.find((c: any) => c.name === "announcements" && c.isTextBased()) as any;
+          if (!targetChannel) {
+            targetChannel = channels.find((c: any) => c.isTextBased()) as any;
+          }
+
+          if (targetChannel && 'send' in targetChannel) {
+            for (const treasure of generatedTreasures) {
+              if (treasure.rarity === "epic" || treasure.rarity === "legendary") {
+                const embed = new EmbedBuilder()
+                  .setTitle(`🏆 RARE TREASURE ALERT!`)
+                  .setDescription(`A legendary treasure has appeared in the shop!`)
+                  .setColor(treasure.rarity === "legendary" ? 0xffd700 : 0xff6600)
+                  .addFields(
+                    { name: "Item", value: treasure.name, inline: false },
+                    { name: "Rarity", value: treasure.rarity.toUpperCase(), inline: true },
+                    { name: "Price", value: `${treasure.price} Void Crystals`, inline: true },
+                    {
+                      name: "Stats",
+                      value: `Power +${treasure.powerBonus} | Defense +${treasure.defenseBonus}`,
+                      inline: false,
+                    }
+                  )
+                  .setTimestamp();
+
+                await (targetChannel as any).send({ embeds: [embed] }).catch(console.error);
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`✨ Generated ${generatedTreasures.length} treasures`);
+    } catch (error) {
+      console.error("Error generating treasures:", error);
+    }
+  }
+
+  private async autoGenerateBloodlines() {
+    try {
+      console.log("🩸 Auto-generating bloodlines for premium users...");
+      const bloodlineNames = [
+        "Phoenix Bloodline",
+        "Dragon Bloodline",
+        "Demon Bloodline",
+        "Angel Bloodline",
+        "God Bloodline",
+        "Void Bloodline",
+        "Celestial Bloodline",
+        "Primordial Bloodline",
+      ];
+
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      for (const [serverId] of guilds) {
+        const users = await storage.getUsersInServer(serverId);
+
+        // For demonstration, mark users with 3+ rebirths as "premium"
+        for (const user of users) {
+          if (user.rebirthCount >= 3 && !user.bloodlineId) {
+            const bloodlineName = bloodlineNames[Math.floor(Math.random() * bloodlineNames.length)];
+            const bloodline = await storage.createBloodline({
+              name: bloodlineName,
+              description: `A powerful ${bloodlineName} awakens within you!`,
+              powerBonus: Math.floor(Math.random() * 100) + 50,
+              defenseBonus: Math.floor(Math.random() * 50) + 25,
+              wisdomBonus: Math.floor(Math.random() * 75) + 25,
+              agilityBonus: Math.floor(Math.random() * 50) + 25,
+            } as any);
+
+            await storage.updateUser(user.id, {
+              bloodlineId: bloodline.id,
+            } as any);
+
+            // Announce to user
+            try {
+              const discordUser = await this.client.users.fetch(user.discordId);
+              const embed = new EmbedBuilder()
+                .setTitle("🩸 BLOODLINE AWAKENING!")
+                .setDescription(`You have awakened a ${bloodlineName}!`)
+                .setColor(0xff0000)
+                .addFields(
+                  { name: "Bloodline", value: bloodlineName, inline: false },
+                  { name: "Power Bonus", value: `+${bloodline.powerBonus}`, inline: true },
+                  { name: "Defense Bonus", value: `+${bloodline.defenseBonus}`, inline: true }
+                )
+                .setTimestamp();
+
+              await discordUser.send({ embeds: [embed] }).catch(console.error);
+            } catch (error) {
+              console.error("Error sending DM:", error);
+            }
+          }
+        }
+      }
+
+      console.log("✅ Bloodline generation complete");
+    } catch (error) {
+      console.error("Error generating bloodlines:", error);
+    }
+  }
+
+  private async triggerRandomEvent() {
+    try {
+      console.log("🎲 Triggering random event...");
+      const events = [
+        {
+          type: "meteor_shower",
+          name: "🌠 Meteor Shower",
+          message:
+            "Meteors rain down from the heavens! All cultivators gain 2x void crystals for the next hour!",
+          reward: "double_crystals",
+        },
+        {
+          type: "void_rift",
+          name: "🌀 Void Rift",
+          message: "A void rift opens! All cultivators can breach a realm instantly!",
+          reward: "free_breakthrough",
+        },
+        {
+          type: "celestial_blessing",
+          name: "⭐ Celestial Blessing",
+          message: "The heavens bless you! All cultivators gain 1000 spirit points!",
+          reward: "spirit_points",
+        },
+        {
+          type: "fate_alignment",
+          name: "🎯 Fate Alignment",
+          message: "Fate aligns! All cultivators gain 100 karma points!",
+          reward: "karma",
+        },
+      ];
+
+      const randomEvent = events[Math.floor(Math.random() * events.length)];
+
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      for (const [serverId] of guilds) {
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (channels) {
+          const textChannel = channels.find((c: any) => c.isTextBased()) as any;
+          if (textChannel && 'send' in textChannel) {
+            const embed = new EmbedBuilder()
+              .setTitle(randomEvent.name)
+              .setDescription(randomEvent.message)
+              .setColor(0x9966ff)
+              .setTimestamp();
+
+            await (textChannel as any).send({ embeds: [embed] }).catch(console.error);
+
+            // Apply rewards
+            const users = await storage.getUsersInServer(serverId);
+            for (const user of users) {
+              let updates: any = {};
+              switch (randomEvent.reward) {
+                case "double_crystals":
+                  updates.voidCrystals = user.voidCrystals + 500;
+                  break;
+                case "spirit_points":
+                  updates.spiritPoints = user.spiritPoints + 1000;
+                  break;
+                case "karma":
+                  updates.karma = user.karma + 100;
+                  break;
+              }
+              if (Object.keys(updates).length > 0) {
+                await storage.updateUser(user.id, updates);
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`✅ Event triggered: ${randomEvent.name}`);
+    } catch (error) {
+      console.error("Error triggering random event:", error);
+    }
   }
 
   private async setupCommands() {
