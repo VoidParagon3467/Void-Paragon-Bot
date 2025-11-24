@@ -13,7 +13,12 @@ import { cultivationRealms, rankHierarchy } from "@shared/schema";
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let openai: any = null;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+} else {
+  console.warn("⚠️ OPENAI_API_KEY not set. AI features (DM chat, smart games) disabled. Bot will run with core features only.");
+}
 
 export class CultivationBot {
   private client: Client;
@@ -2924,6 +2929,11 @@ export class CultivationBot {
 
   private async handleDMConversation(message: any) {
     try {
+      if (!openai) {
+        await message.reply("🔮 **DM Chat unavailable** - OpenAI API key not configured. Use `/startgame` for basic games instead.").catch(console.error);
+        return;
+      }
+
       const userId = message.author.id;
       const userKey = `dm_${userId}`;
 
@@ -3035,6 +3045,12 @@ Be conversational, use cultivation terminology naturally, and keep responses und
 
   private async playTrivia(message: any, gameKey: string) {
     try {
+      if (!openai) {
+        await message.reply("🎓 **Basic Trivia** (AI disabled)\n\nQ: What is the highest cultivation realm?\nA) Transcendent\nB) True God Realm\nC) Sage Immortal\nD) Divine Emperor\n\nReply with A, B, C, or D!").catch(console.error);
+        this.activeGames.set(gameKey, { type: "trivia", correct: "B", attempts: 0 });
+        return;
+      }
+
       const response = await openai.chat.completions.create({
         model: "gpt-5",
         messages: [
@@ -3062,6 +3078,12 @@ Be conversational, use cultivation terminology naturally, and keep responses und
 
   private async playRiddle(message: any, gameKey: string) {
     try {
+      if (!openai) {
+        await message.reply(`🧩 **Riddle Challenge!**\n\nI am the path that reaches the heavens, yet requires no feet to climb. What am I?\n\nReply with your guess!`).catch(console.error);
+        this.activeGames.set(gameKey, { type: "riddle", correct: "cultivation" });
+        return;
+      }
+
       const response = await openai.chat.completions.create({
         model: "gpt-5",
         messages: [
@@ -3088,18 +3110,29 @@ Be conversational, use cultivation terminology naturally, and keep responses und
 
   private async playFortuneTelling(message: any, gameKey: string) {
     try {
-      const response = await openai.chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          {
-            role: "user",
-            content: `Generate a mystical Xianxia fortune telling for a Discord user named "${message.author.username}". Include: destiny prediction, cultivation advice, lucky realm/day, and mystical warning. Keep it under 300 characters. Make it fun and encouraging!`,
-          },
-        ],
-        max_completion_tokens: 200,
-      });
+      let fortune = "Your path is shrouded in destiny...";
 
-      const fortune = response.choices[0].message.content || "Your path is shrouded in destiny...";
+      if (openai) {
+        const response = await openai.chat.completions.create({
+          model: "gpt-5",
+          messages: [
+            {
+              role: "user",
+              content: `Generate a mystical Xianxia fortune telling for a Discord user named "${message.author.username}". Include: destiny prediction, cultivation advice, lucky realm/day, and mystical warning. Keep it under 300 characters. Make it fun and encouraging!`,
+            },
+          ],
+          max_completion_tokens: 200,
+        });
+
+        fortune = response.choices[0].message.content || fortune;
+      } else {
+        const fortunes = [
+          "Your cultivation shall reach the True God Realm. Lucky day: Tuesday. Beware of complacency.",
+          "The heavens align in your favor, " + message.author.username + ". Push forward with determination. Lucky realm: Immortal Ascension.",
+          "Your tribulation awaits, but victory is assured. Trust in your sect brothers and sisters.",
+        ];
+        fortune = fortunes[Math.floor(Math.random() * fortunes.length)];
+      }
 
       this.activeGames.set(gameKey, { type: "fortune", completed: true });
 
