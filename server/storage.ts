@@ -1,11 +1,11 @@
 import { 
   users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
-  battles, activities, serverSettings,
+  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
   type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
   type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
   type Battle, type InsertBattle, type Activity, type InsertActivity,
-  type ServerSettings, type InsertServerSettings
+  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, gte, lte, count, sql } from "drizzle-orm";
@@ -46,6 +46,32 @@ export interface IStorage {
   giveToken(userId: number, type: string, quantity?: number): Promise<Token>;
   useToken(tokenId: number): Promise<void>;
   
+  // Divine Body operations
+  getDivineBodies(): Promise<DivineBody[]>;
+  getDivineBodyById(id: number): Promise<DivineBody | undefined>;
+  createDivineBody(body: any): Promise<DivineBody>;
+
+  // Dao operations
+  getDaos(): Promise<Dao[]>;
+  getDaoById(id: number): Promise<Dao | undefined>;
+  createDao(dao: any): Promise<Dao>;
+
+  // Title operations
+  getTitles(): Promise<Title[]>;
+  getTitleById(id: number): Promise<Title | undefined>;
+  createTitle(title: any): Promise<Title>;
+
+  // Weapon operations
+  getWeapons(): Promise<Weapon[]>;
+  getWeaponById(id: number): Promise<Weapon | undefined>;
+  createWeapon(weapon: any): Promise<Weapon>;
+
+  // Breakthrough Treasure operations
+  getBreakthroughTreasures(): Promise<BreakthroughTreasure[]>;
+  getBreakthroughTreasureById(id: number): Promise<BreakthroughTreasure | undefined>;
+  createBreakthroughTreasure(treasure: any): Promise<BreakthroughTreasure>;
+  getBreakthroughTreasuresByMaxRealm(maxRealmIndex: number): Promise<BreakthroughTreasure[]>;
+
   // Item operations
   getItems(): Promise<Item[]>;
   getItemById(id: number): Promise<Item | undefined>;
@@ -309,6 +335,80 @@ export class DatabaseStorage implements IStorage {
       .update(tokens)
       .set({ usedAt: new Date() })
       .where(eq(tokens.id, tokenId));
+  }
+
+  async getDivineBodies(): Promise<DivineBody[]> {
+    return await db.select().from(divineBodies);
+  }
+
+  async getDivineBodyById(id: number): Promise<DivineBody | undefined> {
+    const [body] = await db.select().from(divineBodies).where(eq(divineBodies.id, id));
+    return body || undefined;
+  }
+
+  async createDivineBody(body: any): Promise<DivineBody> {
+    const [newBody] = await db.insert(divineBodies).values(body).returning();
+    return newBody;
+  }
+
+  async getDaos(): Promise<Dao[]> {
+    return await db.select().from(daos);
+  }
+
+  async getDaoById(id: number): Promise<Dao | undefined> {
+    const [dao] = await db.select().from(daos).where(eq(daos.id, id));
+    return dao || undefined;
+  }
+
+  async createDao(dao: any): Promise<Dao> {
+    const [newDao] = await db.insert(daos).values(dao).returning();
+    return newDao;
+  }
+
+  async getTitles(): Promise<Title[]> {
+    return await db.select().from(titles);
+  }
+
+  async getTitleById(id: number): Promise<Title | undefined> {
+    const [title] = await db.select().from(titles).where(eq(titles.id, id));
+    return title || undefined;
+  }
+
+  async createTitle(title: any): Promise<Title> {
+    const [newTitle] = await db.insert(titles).values(title).returning();
+    return newTitle;
+  }
+
+  async getWeapons(): Promise<Weapon[]> {
+    return await db.select().from(weapons);
+  }
+
+  async getWeaponById(id: number): Promise<Weapon | undefined> {
+    const [weapon] = await db.select().from(weapons).where(eq(weapons.id, id));
+    return weapon || undefined;
+  }
+
+  async createWeapon(weapon: any): Promise<Weapon> {
+    const [newWeapon] = await db.insert(weapons).values(weapon).returning();
+    return newWeapon;
+  }
+
+  async getBreakthroughTreasures(): Promise<BreakthroughTreasure[]> {
+    return await db.select().from(breakthroughTreasures);
+  }
+
+  async getBreakthroughTreasureById(id: number): Promise<BreakthroughTreasure | undefined> {
+    const [treasure] = await db.select().from(breakthroughTreasures).where(eq(breakthroughTreasures.id, id));
+    return treasure || undefined;
+  }
+
+  async createBreakthroughTreasure(treasure: any): Promise<BreakthroughTreasure> {
+    const [newTreasure] = await db.insert(breakthroughTreasures).values(treasure).returning();
+    return newTreasure;
+  }
+
+  async getBreakthroughTreasuresByMaxRealm(maxRealmIndex: number): Promise<BreakthroughTreasure[]> {
+    return await db.select().from(breakthroughTreasures).where(lte(breakthroughTreasures.maxRealmIndex, maxRealmIndex));
   }
 
   async getItems(): Promise<Item[]> {

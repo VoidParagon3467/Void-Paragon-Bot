@@ -53,6 +53,14 @@ export const users = pgTable("users", {
   fate: integer("fate").notNull().default(0), // Luck stat - affects battles, spars, airdrops, dangerous situations
   // Bloodline
   bloodlineId: integer("bloodline_id"),
+  // Divine Body
+  divineBodyId: integer("divine_body_id"),
+  // Dao
+  daoId: integer("dao_id"),
+  // Title
+  titleId: integer("title_id"),
+  // Equipped Weapon
+  equippedWeaponId: integer("equipped_weapon_id"),
   // Faction
   factionId: integer("faction_id"),
   factionRank: text("faction_rank"),
@@ -135,6 +143,81 @@ export const tokens = pgTable("tokens", {
   usedAt: timestamp("used_at"),
 });
 
+// Divine Bodies table
+export const divineBodies = pgTable("divine_bodies", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  rarity: rarityEnum("rarity").notNull(),
+  description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0), // Minimum realm to obtain
+  powerBonus: integer("power_bonus").notNull().default(0),
+  defenseBonus: integer("defense_bonus").notNull().default(0),
+  agilityBonus: integer("agility_bonus").notNull().default(0),
+  wisdomBonus: integer("wisdom_bonus").notNull().default(0),
+  specialAbilities: jsonb("special_abilities"),
+  price: integer("price").notNull(), // VC cost
+  icon: text("icon"),
+});
+
+// Special Daos table
+export const daos = pgTable("daos", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  rarity: rarityEnum("rarity").notNull(),
+  description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  wisdomBonus: integer("wisdom_bonus").notNull().default(0),
+  specialAbilities: jsonb("special_abilities"),
+  price: integer("price").notNull(),
+  icon: text("icon"),
+});
+
+// Unique Titles table
+export const titles = pgTable("titles", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  powerBonus: integer("power_bonus").notNull().default(0),
+  defenseBonus: integer("defense_bonus").notNull().default(0),
+  agilityBonus: integer("agility_bonus").notNull().default(0),
+  wisdomBonus: integer("wisdom_bonus").notNull().default(0),
+  specialEffects: jsonb("special_effects"),
+  price: integer("price").notNull(),
+  icon: text("icon"),
+});
+
+// Special Weapons table
+export const weapons = pgTable("weapons", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  rarity: rarityEnum("rarity").notNull(),
+  description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0),
+  weaponType: text("weapon_type").notNull(), // sword, staff, fist, etc
+  offenseBonus: integer("offense_bonus").notNull().default(0),
+  defenseBonus: integer("defense_bonus").notNull().default(0),
+  specialAbilities: jsonb("special_abilities"),
+  price: integer("price").notNull(),
+  icon: text("icon"),
+});
+
+// Breakthrough Treasures table (special one-time use treasures)
+export const breakthroughTreasures = pgTable("breakthrough_treasures", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  rarity: rarityEnum("rarity").notNull(),
+  description: text("description"),
+  maxRealmIndex: integer("max_realm_index").notNull(), // Maximum realm this works on (e.g., Deity Realm = index 5)
+  levelGain: integer("level_gain").notNull().default(1), // How many levels it grants
+  priceVc: integer("price_vc").notNull().default(0),
+  priceSp: integer("price_sp").notNull().default(0),
+  priceKarma: integer("price_karma").notNull().default(0), // For high-level treasures
+  appearanceFrequencyDays: integer("appearance_frequency_days").notNull().default(1), // How rare (1 = daily, 90 = quarterly)
+  lastAppearedAt: timestamp("last_appeared_at"),
+  icon: text("icon"),
+});
+
 // Items table
 export const items = pgTable("items", {
   id: serial("id").primaryKey(),
@@ -142,6 +225,7 @@ export const items = pgTable("items", {
   type: itemTypeEnum("type").notNull(),
   rarity: rarityEnum("rarity").notNull(),
   description: text("description"),
+  minRealmIndex: integer("min_realm_index").notNull().default(0), // Minimum realm to use
   powerBonus: integer("power_bonus").notNull().default(0),
   defenseBonus: integer("defense_bonus").notNull().default(0),
   agilityBonus: integer("agility_bonus").notNull().default(0),
@@ -359,6 +443,27 @@ export const insertTokenSchema = createInsertSchema(tokens).omit({
   id: true,
   acquiredAt: true,
   usedAt: true,
+});
+
+export const insertDivineBodySchema = createInsertSchema(divineBodies).omit({
+  id: true,
+});
+
+export const insertDaoSchema = createInsertSchema(daos).omit({
+  id: true,
+});
+
+export const insertTitleSchema = createInsertSchema(titles).omit({
+  id: true,
+});
+
+export const insertWeaponSchema = createInsertSchema(weapons).omit({
+  id: true,
+});
+
+export const insertBreakthroughTreasureSchema = createInsertSchema(breakthroughTreasures).omit({
+  id: true,
+  lastAppearedAt: true,
 });
 
 export const insertItemSchema = createInsertSchema(items).omit({
