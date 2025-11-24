@@ -310,6 +310,7 @@ export const serverSettings = pgTable("server_settings", {
   hallOfFameChannelId: text("hall_of_fame_channel_id"), // Daily leaderboards
   miniEventsChannelId: text("mini_events_channel_id"), // Event announcements
   premiumRewardsChannelId: text("premium_rewards_channel_id"), // Paid items
+  botLogsChannelId: text("bot_logs_channel_id"), // Sect master-only logs channel
   xpMultiplier: decimal("xp_multiplier").notNull().default("1.0"),
   premiumEnabled: boolean("premium_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),

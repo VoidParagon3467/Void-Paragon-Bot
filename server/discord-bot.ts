@@ -14,6 +14,7 @@ import { cultivationRealms, rankHierarchy } from "@shared/schema";
 export class CultivationBot {
   private client: Client;
   private readonly TOKEN = process.env.DISCORD_TOKEN;
+  private logThreadMap: Map<string, string> = new Map(); // Map of serverId to thread ID
 
   constructor() {
     this.client = new Client({
@@ -29,6 +30,79 @@ export class CultivationBot {
     this.setupCommands();
   }
 
+  // Comprehensive bot logging system
+  private async logBotEvent(serverId: string, category: string, message: string, details?: any) {
+    try {
+      let settings;
+      try {
+        settings = await storage.getServerSettings(serverId);
+      } catch (e: any) {
+        // Gracefully handle missing columns during migration
+        if (e.code === '42703' || e.message?.includes('does not exist')) {
+          return; // Skip logging if columns don't exist yet
+        }
+        throw e;
+      }
+      if (!settings?.botLogsChannelId) return; // No logs channel configured
+
+      const guild = this.client.guilds.cache.get(serverId);
+      if (!guild) return;
+
+      const channel = guild.channels.cache.get(settings.botLogsChannelId) as any;
+      if (!channel || !('send' in channel)) return;
+
+      // Check if user is sect master
+      const sectMasterId = settings.sectMasterId;
+      if (!sectMasterId) return; // No sect master set
+
+      // Permission check: only visible to sect master
+      await channel.permissionOverwrites.edit(sectMasterId, {
+        ViewChannel: true,
+        ReadMessageHistory: true,
+      }).catch(() => {});
+
+      // Format the log message
+      const timestamp = new Date().toLocaleTimeString();
+      const logContent = details 
+        ? `[${timestamp}] ${message}\n\`\`\`json\n${JSON.stringify(details, null, 2)}\n\`\`\`` 
+        : `[${timestamp}] ${message}`;
+
+      // Create or get thread for this category
+      let threadId = this.logThreadMap.get(`${serverId}_${category}`);
+      let thread;
+
+      if (threadId) {
+        thread = await channel.threads.fetch(threadId).catch(() => null);
+      }
+
+      if (!thread) {
+        // Create new thread for this category
+        const mainMessage = await channel.send({
+          content: `🔹 **${category}** LOG THREAD\n*Auto-updating logs for ${category} events*`,
+        });
+        thread = await mainMessage.startThread({
+          name: `${category}-logs`,
+          autoArchiveDuration: 10080, // 7 days
+        });
+        threadId = thread.id;
+        this.logThreadMap.set(`${serverId}_${category}`, threadId);
+      }
+
+      // Send log to thread
+      if (logContent.length > 2000) {
+        // Split long messages
+        const chunks = logContent.match(/[\s\S]{1,1990}/g) || [];
+        for (const chunk of chunks) {
+          await thread.send(chunk).catch(console.error);
+        }
+      } else {
+        await thread.send(logContent).catch(console.error);
+      }
+    } catch (error) {
+      console.error("Error logging bot event:", error);
+    }
+  }
+
   private setupEventHandlers() {
     this.client.on("ready", () => {
       console.log(`✅ Bot is ready! Logged in as ${this.client.user?.tag}`);
@@ -36,17 +110,44 @@ export class CultivationBot {
     });
 
     this.client.on("guildMemberAdd", async (member) => {
+      const logMsg = `👤 New member joined: ${member.user.tag}`;
+      console.log(logMsg);
+      await this.logBotEvent(member.guild.id, "Members", logMsg, {
+        member: member.user.tag,
+        memberId: member.id,
+        joinedAt: new Date().toISOString(),
+      });
       await this.handleNewMember(member);
     });
 
     this.client.on("messageCreate", async (message) => {
       if (message.author.bot) return;
+      const logMsg = `💬 Message from ${message.author.tag}: "${message.content.substring(0, 50)}${message.content.length > 50 ? '...' : ''}"`;
+      // Only log important messages, not all to avoid spam
+      if (message.mentions.has(this.client.user?.id || '')) {
+        await this.logBotEvent(message.guildId || '', "Messages", logMsg, {
+          author: message.author.tag,
+          authorId: message.author.id,
+          content: message.content,
+          mentions: message.mentions.map(u => u.tag),
+        });
+      }
       await this.handleChatXp(message);
     });
 
     this.client.on("interactionCreate", async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
-      console.log(`🎮 Executing: ${interaction.commandName} by ${interaction.user.tag}`);
+      const logMsg = `🎮 Executing: ${interaction.commandName} by ${interaction.user.tag}`;
+      console.log(logMsg);
+      const serverId = interaction.guildId;
+      if (serverId) {
+        await this.logBotEvent(serverId, "Commands", logMsg, {
+          command: interaction.commandName,
+          user: interaction.user.tag,
+          userId: interaction.user.id,
+          timestamp: new Date().toISOString(),
+        });
+      }
       await this.handleSlashCommand(interaction);
     });
 
@@ -108,10 +209,12 @@ export class CultivationBot {
 
   private async distributeDailyResources() {
     try {
-      console.log("📦 Distributing daily resources by rank...");
+      const logMsg = "📦 Distributing daily resources by rank...";
+      console.log(logMsg);
       const guilds = Array.from(this.client.guilds.cache.entries());
 
       for (const [serverId] of guilds) {
+        await this.logBotEvent(serverId, "Systems", logMsg);
         const users = await storage.getUsersInServer(serverId);
 
         for (const userRecord of users) {
@@ -154,7 +257,12 @@ export class CultivationBot {
 
   private async autoGenerateTreasures() {
     try {
-      console.log("✨ Auto-generating treasures with tiered pricing...");
+      const logMsg = "✨ Auto-generating treasures with tiered pricing...";
+      console.log(logMsg);
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      for (const [serverId] of guilds) {
+        await this.logBotEvent(serverId, "ItemGeneration", logMsg);
+      }
       const treasureNames = [
         "Spirit Stone", "Heaven Pill", "Void Shard", "Dragon Scale", "Phoenix Feather",
         "Celestial Pearl", "Demon Blood", "God Core", "Infinite Jade", "Soul Essence",
@@ -1171,7 +1279,17 @@ export class CultivationBot {
           });
       }
     } catch (error) {
-      console.error("❌ Error handling slash command:", error);
+      const errMsg = `❌ Error handling slash command: ${commandName}`;
+      console.error(errMsg, error);
+      const serverId = interaction.guildId;
+      if (serverId) {
+        await this.logBotEvent(serverId, "Errors", errMsg, {
+          command: commandName,
+          error: String(error),
+          user: interaction.user.tag,
+          timestamp: new Date().toISOString(),
+        });
+      }
       try {
         await interaction.reply({
           content: "An error occurred. Please try again.",
@@ -1222,6 +1340,12 @@ export class CultivationBot {
           karma: 999999,
           fate: 999999,
         } as any)) as any;
+        const logMsg = "👑 Supreme Sect Master initialized";
+        await this.logBotEvent(interaction.guild.id, "Users", logMsg, {
+          userId: interaction.user.id,
+          username: interaction.user.username,
+          rank: "Supreme Sect Master",
+        });
       }
       return user;
     } catch (error) {
