@@ -43,6 +43,9 @@ export const users = pgTable("users", {
   // Faction
   factionId: integer("faction_id"),
   factionRank: text("faction_rank"),
+  // Clan
+  clanId: integer("clan_id"),
+  clanRole: text("clan_role"),
   // Premium
   isPremium: boolean("is_premium").notNull().default(false),
   premiumExpiresAt: timestamp("premium_expires_at"),
@@ -79,6 +82,21 @@ export const factions = pgTable("factions", {
   leaderId: integer("leader_id"),
   warPoints: integer("war_points").notNull().default(0),
   memberCount: integer("member_count").notNull().default(0),
+  icon: text("icon"),
+  serverId: text("server_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Clans table (larger organizations than factions)
+export const clans = pgTable("clans", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  founderId: integer("founder_id"),
+  level: integer("level").notNull().default(1), // Clan levels 1-10
+  prestige: integer("prestige").notNull().default(0),
+  memberCount: integer("member_count").notNull().default(0),
+  treasury: integer("treasury").notNull().default(0), // Shared resources
   icon: text("icon"),
   serverId: text("server_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -187,6 +205,10 @@ export const userRelations = relations(users, ({ one, many }) => ({
     fields: [users.factionId],
     references: [factions.id],
   }),
+  clan: one(clans, {
+    fields: [users.clanId],
+    references: [clans.id],
+  }),
   items: many(userItems),
   missions: many(userMissions),
   battlesAsAttacker: many(battles, { relationName: "attacker" }),
@@ -201,6 +223,14 @@ export const bloodlineRelations = relations(bloodlines, ({ many }) => ({
 export const factionRelations = relations(factions, ({ one, many }) => ({
   leader: one(users, {
     fields: [factions.leaderId],
+    references: [users.id],
+  }),
+  members: many(users),
+}));
+
+export const clanRelations = relations(clans, ({ one, many }) => ({
+  founder: one(users, {
+    fields: [clans.founderId],
     references: [users.id],
   }),
   members: many(users),
@@ -271,6 +301,14 @@ export const insertFactionSchema = createInsertSchema(factions).omit({
   id: true,
   createdAt: true,
   memberCount: true,
+});
+
+export const insertClanSchema = createInsertSchema(clans).omit({
+  id: true,
+  createdAt: true,
+  memberCount: true,
+  prestige: true,
+  treasury: true,
 });
 
 export const insertItemSchema = createInsertSchema(items).omit({

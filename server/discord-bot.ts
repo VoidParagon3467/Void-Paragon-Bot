@@ -88,16 +88,11 @@ export class CultivationBot {
           // Skip supreme sect master - they already have infinite
           if (userRecord.isSupremeSectMaster) continue;
           
-          const voidCrystalsReward = 50 * userRecord.level;
-          // Spirit Points VERY RARE - only 10% of void crystals (kept sparse)
-          const spiritPointsReward = Math.floor(voidCrystalsReward * 0.1);
-          // Karma EXCEEDINGLY RARE - only 1-3 max per day
-          const karmaReward = Math.floor(Math.random() * 3) + 1;
+          // ONLY Void Crystals as daily reward - not enough to buy expensive items in one day
+          const voidCrystalsReward = 10 * userRecord.level; // Much lower amount - requires accumulation
           
           await storage.updateUser(userRecord.id, {
             voidCrystals: userRecord.voidCrystals + voidCrystalsReward,
-            spiritPoints: userRecord.spiritPoints + spiritPointsReward,
-            karma: userRecord.karma + karmaReward,
           } as any);
         }
 
@@ -111,8 +106,8 @@ export class CultivationBot {
               .setDescription(`All cultivators have received their daily resources!`)
               .setColor(0x00ff88)
               .addFields({
-                name: "Rewards (Per Player)",
-                value: `💎 50 × Level Void Crystals\n✨ 5 × Level Spirit Points (Very Rare)\n⭐ 1-3 Karma (Exceedingly Rare)`,
+                name: "Daily Rewards (Per Player)",
+                value: `💎 10 × Level Void Crystals\n\n⚠️ Spirit Points and Karma are earned only through events and treasures!\n✨ Save your VC to purchase treasures!`,
               })
               .setTimestamp();
 
@@ -127,84 +122,106 @@ export class CultivationBot {
 
   private async autoGenerateTreasures() {
     try {
-      console.log("✨ Auto-generating treasures...");
-      const rarities = ["common", "uncommon", "rare", "epic", "legendary"];
+      console.log("✨ Auto-generating treasures with tiered pricing...");
       const treasureNames = [
-        "Spirit Stone",
-        "Heaven Pill",
-        "Void Shard",
-        "Dragon Scale",
-        "Phoenix Feather",
-        "Celestial Pearl",
-        "Demon Blood",
-        "God Core",
-        "Infinite Jade",
-        "Soul Essence",
+        "Spirit Stone", "Heaven Pill", "Void Shard", "Dragon Scale", "Phoenix Feather",
+        "Celestial Pearl", "Demon Blood", "God Core", "Infinite Jade", "Soul Essence",
       ];
 
-      // Generate 3-5 random treasures
-      const count = Math.floor(Math.random() * 3) + 3;
+      // Generate mostly lower rarity, rarely epics/legendaries
       const generatedTreasures = [];
+      
+      // Weighted rarity: 40% common, 35% uncommon, 15% rare, 8% epic, 2% legendary
+      const rarity = Math.random() > 0.98 ? "legendary" : 
+                     Math.random() > 0.90 ? "epic" :
+                     Math.random() > 0.75 ? "rare" :
+                     Math.random() > 0.40 ? "uncommon" : "common";
 
-      for (let i = 0; i < count; i++) {
-        const rarity = rarities[Math.floor(Math.random() * rarities.length)];
-        const name = treasureNames[Math.floor(Math.random() * treasureNames.length)];
-        const priceMultiplier = { common: 100, uncommon: 250, rare: 500, epic: 1500, legendary: 5000 };
-        const price = priceMultiplier[rarity as keyof typeof priceMultiplier] || 100;
+      const name = treasureNames[Math.floor(Math.random() * treasureNames.length)];
 
-        const item = await storage.createItem({
-          name: `${name} (${rarity})`,
-          type: "treasure",
-          rarity,
-          description: `A rare treasure from the void`,
-          price,
-          powerBonus: Math.floor(Math.random() * 50) + 10,
-          defenseBonus: Math.floor(Math.random() * 30) + 5,
-          agilityBonus: Math.floor(Math.random() * 20) + 5,
-          wisdomBonus: Math.floor(Math.random() * 25) + 5,
-        } as any);
-
-        generatedTreasures.push(item);
+      // TIERED PRICING SYSTEM
+      let price = 0;
+      let priceDescription = "";
+      
+      if (rarity === "common") {
+        price = Math.floor(Math.random() * 200) + 100; // 100-300 VC
+        priceDescription = `${price} Void Crystals`;
+      } else if (rarity === "uncommon") {
+        price = Math.floor(Math.random() * 150) + 150; // 150-300 VC
+        priceDescription = `${price} Void Crystals`;
+      } else if (rarity === "rare") {
+        const vcCost = 300 + Math.floor(Math.random() * 200);
+        const spCost = 5 + Math.floor(Math.random() * 5);
+        price = vcCost;
+        priceDescription = `${vcCost} VC + ${spCost} Spirit Points`;
+      } else if (rarity === "epic") {
+        const karmaCost = 2 + Math.floor(Math.random() * 2); // 2-3 Karma
+        price = karmaCost * 1000; // Store karma cost as multiplier for DB compatibility
+        priceDescription = `${karmaCost} Karma (Exceedingly Rare!)`;
+      } else { // legendary
+        const karmaCost = 3 + Math.floor(Math.random() * 2); // 3-4 Karma
+        price = karmaCost * 1000;
+        priceDescription = `${karmaCost} Karma (Legendary Power!)`;
       }
 
-      // Announce rare treasures in all servers
-      const guilds = Array.from(this.client.guilds.cache.entries());
-      for (const [serverId] of guilds) {
-        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
-        if (channels) {
-          // Find announcement or general channel
-          let targetChannel = channels.find((c: any) => c.name === "announcements" && c.isTextBased()) as any;
-          if (!targetChannel) {
-            targetChannel = channels.find((c: any) => c.isTextBased()) as any;
-          }
+      const specialEffects = {
+        rarity,
+        priceType: rarity === "common" || rarity === "uncommon" ? "vc" : 
+                  rarity === "rare" ? "vc_sp" : "karma",
+        actualPrice: price,
+        priceString: priceDescription,
+      };
 
-          if (targetChannel && 'send' in targetChannel) {
-            for (const treasure of generatedTreasures) {
-              if (treasure.rarity === "epic" || treasure.rarity === "legendary") {
-                const embed = new EmbedBuilder()
-                  .setTitle(`🏆 RARE TREASURE ALERT!`)
-                  .setDescription(`A legendary treasure has appeared in the shop!`)
-                  .setColor(treasure.rarity === "legendary" ? 0xffd700 : 0xff6600)
-                  .addFields(
-                    { name: "Item", value: treasure.name, inline: false },
-                    { name: "Rarity", value: treasure.rarity.toUpperCase(), inline: true },
-                    { name: "Price", value: `${treasure.price} Void Crystals`, inline: true },
-                    {
-                      name: "Stats",
-                      value: `Power +${treasure.powerBonus} | Defense +${treasure.defenseBonus}`,
-                      inline: false,
-                    }
-                  )
-                  .setTimestamp();
+      const item = await storage.createItem({
+        name: `${name}`,
+        type: "treasure",
+        rarity,
+        description: `A ${rarity} treasure imbued with ancient power`,
+        price,
+        powerBonus: rarity === "legendary" ? 150 : rarity === "epic" ? 100 : rarity === "rare" ? 50 : rarity === "uncommon" ? 25 : 10,
+        defenseBonus: rarity === "legendary" ? 100 : rarity === "epic" ? 70 : rarity === "rare" ? 30 : rarity === "uncommon" ? 15 : 5,
+        agilityBonus: rarity === "legendary" ? 80 : rarity === "epic" ? 50 : rarity === "rare" ? 20 : rarity === "uncommon" ? 10 : 5,
+        wisdomBonus: rarity === "legendary" ? 120 : rarity === "epic" ? 80 : rarity === "rare" ? 25 : rarity === "uncommon" ? 12 : 5,
+        specialEffects: specialEffects as any,
+      } as any);
 
-                await (targetChannel as any).send({ embeds: [embed] }).catch(console.error);
-              }
+      generatedTreasures.push(item);
+
+      // Announce epic/legendary treasures (the rare ones that need special currency)
+      if (rarity === "epic" || rarity === "legendary") {
+        const guilds = Array.from(this.client.guilds.cache.entries());
+        for (const [serverId] of guilds) {
+          const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+          if (channels) {
+            let targetChannel = channels.find((c: any) => c.name === "announcements" && c.isTextBased()) as any;
+            if (!targetChannel) {
+              targetChannel = channels.find((c: any) => c.isTextBased()) as any;
+            }
+
+            if (targetChannel && 'send' in targetChannel) {
+              const embed = new EmbedBuilder()
+                .setTitle(`🏆 ${rarity === "legendary" ? "LEGENDARY" : "EPIC"} TREASURE ALERT!`)
+                .setDescription(`A magnificent treasure has appeared in the void!`)
+                .setColor(rarity === "legendary" ? 0xffd700 : 0xff6600)
+                .addFields(
+                  { name: "Treasure", value: item.name, inline: false },
+                  { name: "Rarity", value: `✨ ${rarity.toUpperCase()} ✨`, inline: true },
+                  { name: "Cost", value: priceDescription, inline: true },
+                  {
+                    name: "Bonuses",
+                    value: `⚔️ Power +${item.powerBonus} | 🛡️ Defense +${item.defenseBonus}\n🏃 Agility +${item.agilityBonus} | 🧠 Wisdom +${item.wisdomBonus}`,
+                    inline: false,
+                  }
+                )
+                .setTimestamp();
+
+              await (targetChannel as any).send({ embeds: [embed] }).catch(console.error);
             }
           }
         }
       }
 
-      console.log(`✨ Generated ${generatedTreasures.length} treasures`);
+      console.log(`✨ Generated ${rarity.toUpperCase()} treasure: ${name}`);
     } catch (error) {
       console.error("Error generating treasures:", error);
     }
