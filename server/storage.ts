@@ -44,6 +44,7 @@ export interface IStorage {
   
   // Mission operations
   getMissionsByServer(serverId: string): Promise<Mission[]>;
+  createMission(mission: InsertMission): Promise<Mission>;
   getUserMissions(userId: number): Promise<(UserMission & { mission: Mission })[]>;
   assignMission(userId: number, missionId: number): Promise<UserMission>;
   updateMissionProgress(userId: number, missionId: number, progress: any): Promise<UserMission>;
@@ -265,6 +266,11 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(missions)
       .where(and(eq(missions.serverId, serverId), eq(missions.isActive, true)));
+  }
+
+  async createMission(mission: InsertMission): Promise<Mission> {
+    const [newMission] = await db.insert(missions).values(mission).returning();
+    return newMission;
   }
 
   async getUserMissions(userId: number): Promise<(UserMission & { mission: Mission })[]> {

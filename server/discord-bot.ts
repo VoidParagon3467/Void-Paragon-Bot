@@ -1,8 +1,15 @@
 import * as dotenv from "dotenv";
 dotenv.config();
-import { Client, GatewayIntentBits, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { storage } from './storage';
-import { cultivationRealms } from '@shared/schema';
+import {
+  Client,
+  GatewayIntentBits,
+  SlashCommandBuilder,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  ChannelType,
+} from "discord.js";
+import { storage } from "./storage";
+import { cultivationRealms } from "@shared/schema";
 
 export class CultivationBot {
   private client: Client;
@@ -17,1093 +24,1657 @@ export class CultivationBot {
         GatewayIntentBits.GuildMembers,
       ],
     });
-    
+
     this.setupEventHandlers();
     this.setupCommands();
   }
-  
+
   private setupEventHandlers() {
-    this.client.once('ready', () => {
+    this.client.on("ready", () => {
       console.log(`✅ Bot is ready! Logged in as ${this.client.user?.tag}`);
     });
-    
-    this.client.on('guildMemberAdd', async (member) => {
+
+    this.client.on("guildMemberAdd", async (member) => {
       await this.handleNewMember(member);
     });
-    
-    this.client.on('messageCreate', async (message) => {
+
+    this.client.on("messageCreate", async (message) => {
       if (message.author.bot) return;
       await this.handleChatXp(message);
     });
-    
-    this.client.on('interactionCreate', async (interaction) => {
+
+    this.client.on("interactionCreate", async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
       console.log(`🎮 Executing: ${interaction.commandName} by ${interaction.user.tag}`);
       await this.handleSlashCommand(interaction);
     });
 
-    this.client.on('error', error => {
-      console.error('❌ Discord client error:', error);
+    this.client.on("error", (error) => {
+      console.error("❌ Discord client error:", error);
     });
   }
-  
+
   private async setupCommands() {
     const commands = [
+      // Core Commands
       new SlashCommandBuilder()
-        .setName('profile')
-        .setDescription('View your cultivation profile'),
-      
+        .setName("profile")
+        .setDescription("View your cultivation profile"),
+
       new SlashCommandBuilder()
-        .setName('cultivate')
-        .setDescription('Cultivate to increase XP'),
-      
+        .setName("cultivate")
+        .setDescription("Cultivate to increase XP"),
+
       new SlashCommandBuilder()
-        .setName('breakthrough')
-        .setDescription('Attempt a breakthrough to the next realm'),
-      
+        .setName("breakthrough")
+        .setDescription("Attempt a breakthrough to the next realm"),
+
       new SlashCommandBuilder()
-        .setName('spar')
-        .setDescription('Challenge another cultivator to a sparring match')
-        .addUserOption(option =>
-          option.setName('opponent')
-            .setDescription('The cultivator you want to challenge')
-            .setRequired(true)),
-      
+        .setName("stats")
+        .setDescription("View detailed cultivation stats"),
+
+      // Combat
       new SlashCommandBuilder()
-        .setName('faction')
-        .setDescription('Faction management')
-        .addSubcommand(subcommand =>
-          subcommand.setName('create')
-            .setDescription('Create a new faction')
-            .addStringOption(option =>
-              option.setName('name')
-                .setDescription('Name of the faction')
-                .setRequired(true)))
-        .addSubcommand(subcommand =>
-          subcommand.setName('join')
-            .setDescription('Join an existing faction')
-            .addIntegerOption(option =>
-              option.setName('faction_id')
-                .setDescription('Faction ID to join')
-                .setRequired(true)))
-        .addSubcommand(subcommand =>
-          subcommand.setName('leave')
-            .setDescription('Leave your current faction'))
-        .addSubcommand(subcommand =>
-          subcommand.setName('info')
-            .setDescription('View faction information')),
-      
+        .setName("spar")
+        .setDescription("Challenge another cultivator to a sparring match")
+        .addUserOption((option) =>
+          option
+            .setName("opponent")
+            .setDescription("The cultivator you want to challenge")
+            .setRequired(true)
+        ),
+
+      // Faction Commands
       new SlashCommandBuilder()
-        .setName('shop')
-        .setDescription('View the cultivation shop'),
-      
+        .setName("faction")
+        .setDescription("Faction management")
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("create")
+            .setDescription("Create a new faction")
+            .addStringOption((option) =>
+              option
+                .setName("name")
+                .setDescription("Name of the faction")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("list")
+            .setDescription("List all factions")
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("join")
+            .setDescription("Join a faction")
+            .addIntegerOption((option) =>
+              option
+                .setName("faction_id")
+                .setDescription("Faction ID to join")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand.setName("leave").setDescription("Leave your faction")
+        )
+        .addSubcommand((subcommand) =>
+          subcommand.setName("info").setDescription("View faction information")
+        ),
+
+      // Shop Commands
       new SlashCommandBuilder()
-        .setName('buy')
-        .setDescription('Buy an item from the shop')
-        .addIntegerOption(option =>
-          option.setName('item_id')
-            .setDescription('Item ID to purchase')
-            .setRequired(true))
-        .addIntegerOption(option =>
-          option.setName('quantity')
-            .setDescription('Quantity to buy')
-            .setRequired(false)),
-      
+        .setName("shop")
+        .setDescription("View the cultivation shop"),
+
       new SlashCommandBuilder()
-        .setName('inventory')
-        .setDescription('View your inventory'),
-      
+        .setName("buy")
+        .setDescription("Buy an item from the shop")
+        .addIntegerOption((option) =>
+          option
+            .setName("item_id")
+            .setDescription("Item ID to purchase")
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("quantity")
+            .setDescription("Quantity to buy (default: 1)")
+            .setRequired(false)
+        ),
+
+      // Inventory
       new SlashCommandBuilder()
-        .setName('equip')
-        .setDescription('Equip an item')
-        .addIntegerOption(option =>
-          option.setName('item_id')
-            .setDescription('Item ID to equip')
-            .setRequired(true)),
-      
+        .setName("inventory")
+        .setDescription("View your inventory"),
+
       new SlashCommandBuilder()
-        .setName('missions')
-        .setDescription('View your active missions'),
-      
+        .setName("equip")
+        .setDescription("Equip an item")
+        .addIntegerOption((option) =>
+          option
+            .setName("item_id")
+            .setDescription("Item ID to equip")
+            .setRequired(true)
+        ),
+
+      // Missions
       new SlashCommandBuilder()
-        .setName('complete_mission')
-        .setDescription('Complete a mission')
-        .addIntegerOption(option =>
-          option.setName('mission_id')
-            .setDescription('Mission ID to complete')
-            .setRequired(true)),
-      
+        .setName("missions")
+        .setDescription("View your active missions"),
+
       new SlashCommandBuilder()
-        .setName('leaderboard')
-        .setDescription('View the cultivation leaderboard')
-        .addStringOption(option =>
-          option.setName('sort_by')
-            .setDescription('Sort by')
+        .setName("complete_mission")
+        .setDescription("Complete a mission")
+        .addIntegerOption((option) =>
+          option
+            .setName("mission_id")
+            .setDescription("Mission ID to complete")
+            .setRequired(true)
+        ),
+
+      // Leaderboard & Info
+      new SlashCommandBuilder()
+        .setName("leaderboard")
+        .setDescription("View the cultivation leaderboard")
+        .addStringOption((option) =>
+          option
+            .setName("sort_by")
+            .setDescription("Sort by")
             .addChoices(
-              { name: 'Realm', value: 'realm' },
-              { name: 'Level', value: 'level' },
-              { name: 'Void Crystals', value: 'crystals' },
-              { name: 'Rebirth Count', value: 'rebirth' }
-            )),
-      
+              { name: "Realm & Level", value: "realm" },
+              { name: "Void Crystals", value: "crystals" },
+              { name: "Rebirth Count", value: "rebirth" }
+            )
+        ),
+
       new SlashCommandBuilder()
-        .setName('rebirth')
-        .setDescription('Undergo rebirth to start anew with bonuses'),
-      
+        .setName("bloodline")
+        .setDescription("View bloodline information"),
+
+      // World Exploration
       new SlashCommandBuilder()
-        .setName('look')
-        .setDescription('Look around in the world'),
-      
+        .setName("look")
+        .setDescription("Look around in the world"),
+
+      // Rebirth System
       new SlashCommandBuilder()
-        .setName('sectmaster')
-        .setDescription('Sect Master divine powers')
-        .addSubcommand(subcommand =>
-          subcommand.setName('grant')
-            .setDescription('Grant cultivation levels to a disciple')
-            .addUserOption(option =>
-              option.setName('user')
-                .setDescription('The disciple to grant levels to')
-                .setRequired(true))
-            .addIntegerOption(option =>
-              option.setName('levels')
-                .setDescription('Number of levels to grant')
-                .setRequired(true)))
-        .addSubcommand(subcommand =>
-          subcommand.setName('banish')
-            .setDescription('Banish a cultivator back to Connate')
-            .addUserOption(option =>
-              option.setName('user')
-                .setDescription('The cultivator to banish')
-                .setRequired(true)))
-        .addSubcommand(subcommand =>
-          subcommand.setName('event')
-            .setDescription('Start a sect-wide event')
-            .addStringOption(option =>
-              option.setName('type')
-                .setDescription('Type of event')
+        .setName("rebirth")
+        .setDescription("Undergo rebirth to start anew with bonuses"),
+
+      // Trading
+      new SlashCommandBuilder()
+        .setName("trade")
+        .setDescription("Trade items with another player")
+        .addUserOption((option) =>
+          option
+            .setName("player")
+            .setDescription("Player to trade with")
+            .setRequired(true)
+        ),
+
+      // Admin Commands
+      new SlashCommandBuilder()
+        .setName("admin")
+        .setDescription("Admin commands (Server Owner Only)")
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("config")
+            .setDescription("Configure server settings")
+            .addStringOption((option) =>
+              option
+                .setName("setting")
+                .setDescription("Setting to configure")
                 .setRequired(true)
                 .addChoices(
-                  { name: 'Double XP', value: 'double_xp' },
-                  { name: 'Faction War', value: 'faction_war' },
-                  { name: 'Treasure Hunt', value: 'treasure_hunt' }
-                ))),
-      
-      new SlashCommandBuilder()
-        .setName('stats')
-        .setDescription('View detailed cultivation stats'),
-      
-      new SlashCommandBuilder()
-        .setName('bloodline')
-        .setDescription('View your bloodline'),
-      
-      new SlashCommandBuilder()
-        .setName('trade')
-        .setDescription('Trade items with another player')
-        .addUserOption(option =>
-          option.setName('player')
-            .setDescription('Player to trade with')
-            .setRequired(true)),
+                  { name: "XP Multiplier", value: "xp_multiplier" },
+                  { name: "Welcome Channel", value: "welcome_channel" },
+                  { name: "Sect Master", value: "sect_master" }
+                )
+            )
+            .addStringOption((option) =>
+              option
+                .setName("value")
+                .setDescription("Value to set")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("grant")
+            .setDescription("Grant levels to a user")
+            .addUserOption((option) =>
+              option
+                .setName("user")
+                .setDescription("User to grant levels to")
+                .setRequired(true)
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName("levels")
+                .setDescription("Number of levels")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("banish")
+            .setDescription("Reset a user's cultivation")
+            .addUserOption((option) =>
+              option
+                .setName("user")
+                .setDescription("User to banish")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("event")
+            .setDescription("Start a server-wide event")
+            .addStringOption((option) =>
+              option
+                .setName("type")
+                .setDescription("Event type")
+                .setRequired(true)
+                .addChoices(
+                  { name: "Double XP", value: "double_xp" },
+                  { name: "Triple Crystals", value: "triple_crystals" },
+                  { name: "Faction War", value: "faction_war" },
+                  { name: "Treasure Hunt", value: "treasure_hunt" }
+                )
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("add_item")
+            .setDescription("Add item to shop")
+            .addStringOption((option) =>
+              option
+                .setName("name")
+                .setDescription("Item name")
+                .setRequired(true)
+            )
+            .addStringOption((option) =>
+              option
+                .setName("type")
+                .setDescription("Item type")
+                .setRequired(true)
+                .addChoices(
+                  { name: "Weapon", value: "weapon" },
+                  { name: "Armor", value: "armor" },
+                  { name: "Consumable", value: "consumable" },
+                  { name: "Treasure", value: "treasure" },
+                  { name: "Skill", value: "skill" }
+                )
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName("price")
+                .setDescription("Price in void crystals")
+                .setRequired(true)
+            )
+        )
+        .addSubcommand((subcommand) =>
+          subcommand
+            .setName("add_mission")
+            .setDescription("Add mission")
+            .addStringOption((option) =>
+              option
+                .setName("title")
+                .setDescription("Mission title")
+                .setRequired(true)
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName("xp_reward")
+                .setDescription("XP reward")
+                .setRequired(true)
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName("crystal_reward")
+                .setDescription("Crystal reward")
+                .setRequired(true)
+            )
+        ),
     ];
-    
-    this.client.on('ready', async () => {
+
+    this.client.on("ready", async () => {
       const guild = this.client.guilds.cache.first();
       if (guild) {
         try {
-          await guild.commands.set(commands.map(cmd => cmd.toJSON()));
+          await guild.commands.set(commands.map((cmd) => cmd.toJSON()));
           console.log(`✅ Registered ${commands.length} commands`);
         } catch (error) {
-          console.error('❌ Failed to register commands:', error);
+          console.error("❌ Failed to register commands:", error);
         }
       }
     });
   }
-  
+
   private async handleNewMember(member: any) {
     try {
-      const user = await storage.getUserByDiscordId(member.user.id);
+      const user = await storage.getUserByDiscordId(
+        member.user.id,
+        member.guild.id
+      );
       if (!user) {
         await storage.createUser({
           discordId: member.user.id,
           username: member.user.username,
           avatar: member.user.displayAvatarURL(),
           serverId: member.guild.id,
-        });
+        } as any);
       }
     } catch (error) {
-      console.error('Error creating user profile:', error);
+      console.error("Error creating user profile:", error);
     }
   }
-  
+
   private async handleChatXp(message: any) {
     try {
-      const user = await storage.getUserByDiscordId(message.author.id);
+      const user = await storage.getUserByDiscordId(
+        message.author.id,
+        message.guild.id
+      );
       if (!user) {
         await storage.createUser({
           discordId: message.author.id,
           username: message.author.username,
           avatar: message.author.displayAvatarURL(),
           serverId: message.guild.id,
-        });
+        } as any);
         return;
       }
-      
+
       const xpGain = Math.floor(Math.random() * 10) + 5;
       const newXp = user.xp + xpGain;
       const xpToNextLevel = 100 * user.level;
-      
+
       if (newXp >= xpToNextLevel) {
         await storage.updateUser(user.id, {
           level: user.level + 1,
           xp: newXp - xpToNextLevel,
-        });
+        } as any);
       } else {
-        await storage.updateUser(user.id, { xp: newXp });
+        await storage.updateUser(user.id, { xp: newXp } as any);
       }
     } catch (error) {
-      console.error('Error handling chat XP:', error);
+      console.error("Error handling chat XP:", error);
     }
   }
-  
+
   private async handleSlashCommand(interaction: any) {
     const { commandName } = interaction;
-    
+
     try {
       switch (commandName) {
-        case 'profile':
+        case "profile":
           await this.handleProfileCommand(interaction);
           break;
-        case 'cultivate':
+        case "cultivate":
           await this.handleCultivateCommand(interaction);
           break;
-        case 'breakthrough':
+        case "breakthrough":
           await this.handleBreakthroughCommand(interaction);
           break;
-        case 'spar':
+        case "spar":
           await this.handleSparCommand(interaction);
           break;
-        case 'faction':
+        case "faction":
           await this.handleFactionCommand(interaction);
           break;
-        case 'shop':
+        case "shop":
           await this.handleShopCommand(interaction);
           break;
-        case 'buy':
+        case "buy":
           await this.handleBuyCommand(interaction);
           break;
-        case 'inventory':
+        case "inventory":
           await this.handleInventoryCommand(interaction);
           break;
-        case 'equip':
+        case "equip":
           await this.handleEquipCommand(interaction);
           break;
-        case 'missions':
+        case "missions":
           await this.handleMissionsCommand(interaction);
           break;
-        case 'complete_mission':
+        case "complete_mission":
           await this.handleCompleteMissionCommand(interaction);
           break;
-        case 'leaderboard':
+        case "leaderboard":
           await this.handleLeaderboardCommand(interaction);
           break;
-        case 'rebirth':
+        case "rebirth":
           await this.handleRebirthCommand(interaction);
           break;
-        case 'look':
+        case "look":
           await this.handleLookCommand(interaction);
           break;
-        case 'stats':
+        case "stats":
           await this.handleStatsCommand(interaction);
           break;
-        case 'bloodline':
+        case "bloodline":
           await this.handleBloodlineCommand(interaction);
           break;
-        case 'trade':
+        case "trade":
           await this.handleTradeCommand(interaction);
           break;
-        case 'sectmaster':
-          await this.handleSectMasterCommand(interaction);
+        case "admin":
+          await this.handleAdminCommand(interaction);
           break;
         default:
-          await interaction.reply({ content: 'Unknown command!', ephemeral: true });
+          await interaction.reply({
+            content: "Unknown command!",
+            ephemeral: true,
+          });
       }
     } catch (error) {
-      console.error('❌ Error handling slash command:', error);
+      console.error("❌ Error handling slash command:", error);
       try {
-        await interaction.reply({ content: 'An error occurred while processing your command.', ephemeral: true });
+        await interaction.reply({
+          content: "An error occurred. Please try again.",
+          ephemeral: true,
+        });
       } catch (e) {
-        console.error('Failed to send error reply:', e);
+        console.error("Failed to send error reply:", e);
       }
     }
   }
-  
-  private async handleProfileCommand(interaction: any) {
+
+  private async getOrCreateUser(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
+      let user = await storage.getUserByDiscordId(
+        interaction.user.id,
+        interaction.guild.id
+      );
       if (!user) {
-        await interaction.reply({ content: 'You are not registered. Creating profile...', ephemeral: true });
-        await storage.createUser({
+        user = await storage.createUser({
           discordId: interaction.user.id,
           username: interaction.user.username,
           avatar: interaction.user.displayAvatarURL(),
           serverId: interaction.guild.id,
-        });
-        return;
+        } as any);
       }
-      
+      return user;
+    } catch (error) {
+      console.error("Error in getOrCreateUser:", error);
+      throw error;
+    }
+  }
+
+  private async handleProfileCommand(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       const embed = new EmbedBuilder()
         .setTitle(`⚔️ ${user.username}'s Cultivation Profile`)
-        .setColor(0x00D4FF)
+        .setColor(0x00d4ff)
         .addFields(
-          { name: '🏔️ Realm', value: user.realm, inline: true },
-          { name: '📊 Level', value: user.level.toString(), inline: true },
-          { name: '⭐ Rank', value: user.rank, inline: true },
-          { name: '📈 XP Progress', value: `${user.xp} / ${100 * user.level}`, inline: true },
-          { name: '💎 Void Crystals', value: user.voidCrystals.toString(), inline: true },
-          { name: '✨ Spirit Points', value: user.spiritPoints.toString(), inline: true },
-          { name: '🔄 Rebirth Count', value: user.rebirthCount.toString(), inline: true },
-          { name: '✅ Karma', value: user.karma.toString(), inline: true },
-          { name: '🎯 Fate', value: user.fate.toString(), inline: true }
+          {
+            name: "🏔️ Realm",
+            value: user.realm || "Connate Realm",
+            inline: true,
+          },
+          { name: "📊 Level", value: user.level.toString(), inline: true },
+          { name: "⭐ Rank", value: user.rank || "Outer Disciple", inline: true },
+          {
+            name: "📈 XP Progress",
+            value: `${user.xp} / ${100 * user.level}`,
+            inline: true,
+          },
+          {
+            name: "💎 Void Crystals",
+            value: user.voidCrystals.toString(),
+            inline: true,
+          },
+          {
+            name: "✨ Spirit Points",
+            value: user.spiritPoints.toString(),
+            inline: true,
+          },
+          {
+            name: "🔄 Rebirth Count",
+            value: user.rebirthCount.toString(),
+            inline: true,
+          },
+          { name: "✅ Karma", value: user.karma.toString(), inline: true },
+          { name: "🎯 Fate", value: user.fate.toString(), inline: true }
         )
         .setThumbnail(user.avatar || interaction.user.displayAvatarURL())
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error fetching profile.', ephemeral: true });
+      console.error("Error in handleProfileCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching profile.",
+      });
     }
   }
-  
+
   private async handleCultivateCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       const success = Math.random() > 0.3;
       const xpGain = Math.floor(Math.random() * 50) + 50;
-      
+
       if (success) {
         const newXp = user.xp + xpGain;
-        await storage.updateUser(user.id, { xp: newXp });
-        
+        await storage.updateUser(user.id, { xp: newXp } as any);
+
         const embed = new EmbedBuilder()
-          .setTitle('✨ Cultivation Success!')
-          .setDescription(`You have successfully cultivated and gained ${xpGain} XP!`)
-          .setColor(0x00FF88)
+          .setTitle("✨ Cultivation Success!")
+          .setDescription(
+            `You have successfully cultivated and gained ${xpGain} XP!`
+          )
+          .setColor(0x00ff88)
           .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+
+        await interaction.editReply({ embeds: [embed] });
       } else {
         const embed = new EmbedBuilder()
-          .setTitle('⚠️ Cultivation Failed')
-          .setDescription('Your cultivation attempt was unsuccessful. Try again!')
-          .setColor(0xFF8800)
+          .setTitle("⚠️ Cultivation Failed")
+          .setDescription("Your cultivation attempt was unsuccessful. Try again!")
+          .setColor(0xff8800)
           .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+
+        await interaction.editReply({ embeds: [embed] });
       }
     } catch (error) {
-      await interaction.reply({ content: 'Error during cultivation.', ephemeral: true });
+      console.error("Error in handleCultivateCommand:", error);
+      await interaction.editReply({
+        content: "Error during cultivation.",
+      });
     }
   }
-  
+
   private async handleBreakthroughCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      const currentRealmIndex = cultivationRealms.indexOf(
+        user.realm as any
+      );
+
+      if (
+        currentRealmIndex === -1 ||
+        currentRealmIndex >= cultivationRealms.length - 1
+      ) {
+        await interaction.editReply({
+          content: "You cannot breakthrough further!",
+        });
         return;
       }
-      
-      const currentRealmIndex = cultivationRealms.indexOf(user.realm as any);
-      
-      if (currentRealmIndex === -1 || currentRealmIndex >= cultivationRealms.length - 1) {
-        await interaction.reply({ content: 'You cannot breakthrough further!', ephemeral: true });
-        return;
-      }
-      
+
       if (user.level < 9) {
-        await interaction.reply({ content: 'You must reach level 9 to breakthrough!', ephemeral: true });
+        await interaction.editReply({
+          content: "You must reach level 9 to breakthrough!",
+        });
         return;
       }
-      
+
       const success = Math.random() > 0.4;
-      
+
       if (success) {
         const nextRealm = cultivationRealms[currentRealmIndex + 1];
-        await storage.updateUser(user.id, { 
+        await storage.updateUser(user.id, {
           realm: nextRealm,
           level: 1,
           xp: 0,
           voidCrystals: user.voidCrystals + 100,
-        });
-        
+        } as any);
+
         const embed = new EmbedBuilder()
-          .setTitle('🌟 Breakthrough Successful!')
+          .setTitle("🌟 Breakthrough Successful!")
           .setDescription(`You have advanced to ${nextRealm}!`)
-          .setColor(0xFFD700)
+          .setColor(0xffd700)
           .addFields(
-            { name: 'New Realm', value: nextRealm, inline: true },
-            { name: 'Bonus Crystals', value: '+100', inline: true }
+            { name: "New Realm", value: nextRealm, inline: true },
+            { name: "Bonus Crystals", value: "+100", inline: true }
           )
           .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+
+        await interaction.editReply({ embeds: [embed] });
       } else {
         const embed = new EmbedBuilder()
-          .setTitle('💥 Breakthrough Failed!')
-          .setDescription('You were not ready for this breakthrough. Your power was insufficient.')
-          .setColor(0xFF4444)
+          .setTitle("💥 Breakthrough Failed!")
+          .setDescription(
+            "You were not ready for this breakthrough. Your power was insufficient."
+          )
+          .setColor(0xff4444)
           .setTimestamp();
-        
-        await interaction.reply({ embeds: [embed] });
+
+        await interaction.editReply({ embeds: [embed] });
       }
     } catch (error) {
-      await interaction.reply({ content: 'Error during breakthrough.', ephemeral: true });
+      console.error("Error in handleBreakthroughCommand:", error);
+      await interaction.editReply({
+        content: "Error during breakthrough.",
+      });
     }
   }
-  
-  private async handleLookCommand(interaction: any) {
-    const locations = [
-      'You see a peaceful valley with flowing rivers.',
-      'A misty mountain peak looms in the distance.',
-      'An ancient temple stands before you, shrouded in mystery.',
-      'Wild beasts roam the untamed wilderness around you.',
-      'A bustling city marketplace fills the air with sounds of commerce.'
-    ];
-    
-    const location = locations[Math.floor(Math.random() * locations.length)];
-    
-    const embed = new EmbedBuilder()
-      .setTitle('👀 You Look Around')
-      .setDescription(location)
-      .setColor(0x00D4FF)
-      .setTimestamp();
-    
-    await interaction.reply({ embeds: [embed] });
-  }
-  
-  private async handleSparCommand(interaction: any) {
+
+  private async handleStatsCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
-      const opponent = interaction.options.getUser('opponent');
-      const opponentUser = await storage.getUserByDiscordId(opponent.id);
-      
-      if (!opponentUser) {
-        await interaction.reply({ content: `${opponent.username} is not registered.`, ephemeral: true });
-        return;
-      }
-      
-      const userWins = Math.random() * user.level > Math.random() * opponentUser.level;
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       const embed = new EmbedBuilder()
-        .setTitle('⚔️ Sparring Match')
-        .setDescription(`${user.username} vs ${opponent.username}`)
-        .setColor(userWins ? 0x00FF88 : 0xFF8800)
+        .setTitle(`📊 ${user.username}'s Detailed Stats`)
+        .setColor(0x00d4ff)
         .addFields(
-          { name: 'Winner', value: userWins ? user.username : opponent.username, inline: false },
-          { name: `${user.username}'s Realm`, value: user.realm, inline: true },
-          { name: `${opponent.username}'s Realm`, value: opponentUser.realm, inline: true }
+          {
+            name: "Cultivation",
+            value: `Realm: ${user.realm || "Connate Realm"}\nLevel: ${
+              user.level
+            }\nXP: ${user.xp}/${100 * user.level}`,
+            inline: true,
+          },
+          {
+            name: "Currency",
+            value: `Void Crystals: ${user.voidCrystals}\nSpirit Points: ${
+              user.spiritPoints
+            }\nKarma: ${user.karma}\nFate: ${user.fate}`,
+            inline: true,
+          },
+          {
+            name: "Special",
+            value: `Rebirth Count: ${user.rebirthCount}\nRank: ${
+              user.rank || "Outer Disciple"
+            }\nFaction: ${user.factionRank || "None"}`,
+            inline: true,
+          }
         )
         .setTimestamp();
-      
-      if (userWins) {
-        await storage.updateUser(user.id, { 
-          xp: user.xp + 50,
-          voidCrystals: user.voidCrystals + 10,
-          karma: user.karma + 5
-        });
-      }
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error during spar.', ephemeral: true });
+      console.error("Error in handleStatsCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching stats.",
+      });
     }
   }
-  
+
+  private async handleSparCommand(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      const opponent = interaction.options.getUser("opponent");
+      const opponentUser = await storage.getUserByDiscordId(
+        opponent.id,
+        interaction.guild.id
+      );
+
+      if (!opponentUser) {
+        await interaction.editReply({
+          content: `${opponent.username} is not registered.`,
+        });
+        return;
+      }
+
+      if (opponent.id === interaction.user.id) {
+        await interaction.editReply({
+          content: "You cannot spar with yourself!",
+        });
+        return;
+      }
+
+      const userWins =
+        Math.random() * user.level > Math.random() * opponentUser.level;
+
+      const embed = new EmbedBuilder()
+        .setTitle("⚔️ Sparring Match")
+        .setDescription(`${user.username} vs ${opponent.username}`)
+        .setColor(userWins ? 0x00ff88 : 0xff8800)
+        .addFields(
+          {
+            name: "Winner",
+            value: userWins ? user.username : opponent.username,
+            inline: false,
+          },
+          {
+            name: `${user.username}'s Realm`,
+            value: user.realm || "Connate Realm",
+            inline: true,
+          },
+          {
+            name: `${opponent.username}'s Realm`,
+            value: opponentUser.realm || "Connate Realm",
+            inline: true,
+          }
+        )
+        .setTimestamp();
+
+      if (userWins) {
+        await storage.updateUser(user.id, {
+          xp: user.xp + 50,
+          voidCrystals: user.voidCrystals + 10,
+          karma: user.karma + 5,
+        } as any);
+      } else {
+        await storage.updateUser(opponentUser.id, {
+          xp: opponentUser.xp + 50,
+          voidCrystals: opponentUser.voidCrystals + 10,
+          karma: opponentUser.karma + 5,
+        } as any);
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error("Error in handleSparCommand:", error);
+      await interaction.editReply({
+        content: "Error during spar.",
+      });
+    }
+  }
+
   private async handleFactionCommand(interaction: any) {
     const subcommand = interaction.options.getSubcommand();
-    
+
     switch (subcommand) {
-      case 'create':
+      case "create":
         await this.handleCreateFaction(interaction);
         break;
-      case 'join':
+      case "list":
+        await this.handleListFactions(interaction);
+        break;
+      case "join":
         await this.handleJoinFaction(interaction);
         break;
-      case 'leave':
+      case "leave":
         await this.handleLeaveFaction(interaction);
         break;
-      case 'info':
+      case "info":
         await this.handleFactionInfo(interaction);
         break;
     }
   }
-  
+
   private async handleCreateFaction(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      if (user.factionId) {
+        await interaction.editReply({
+          content: "You are already in a faction!",
+        });
         return;
       }
-      
-      const name = interaction.options.getString('name');
-      
+
+      const name = interaction.options.getString("name");
+
       const faction = await storage.createFaction({
         name,
         description: null,
         leaderId: user.id,
-      });
-      
-      await storage.updateUser(user.id, { 
+        serverId: interaction.guild.id,
+      } as any);
+
+      await storage.updateUser(user.id, {
         factionId: faction.id,
-        factionRank: 'Leader'
-      });
-      
+        factionRank: "Leader",
+      } as any);
+
       const embed = new EmbedBuilder()
-        .setTitle('🏛️ Faction Created')
+        .setTitle("🏛️ Faction Created")
         .setDescription(`${name} has been founded!`)
-        .setColor(0x00D4FF)
-        .addFields(
-          { name: 'Your Rank', value: 'Leader', inline: true }
-        )
+        .setColor(0x00d4ff)
+        .addFields({ name: "Your Rank", value: "Leader", inline: true })
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error creating faction.', ephemeral: true });
+      console.error("Error in handleCreateFaction:", error);
+      await interaction.editReply({
+        content: "Error creating faction.",
+      });
     }
   }
-  
+
+  private async handleListFactions(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const factions = await storage.getFactionsByServer(interaction.guild.id);
+
+      if (factions.length === 0) {
+        await interaction.editReply({
+          content: "No factions exist yet!",
+        });
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("🏛️ All Factions")
+        .setColor(0x00d4ff);
+
+      factions.slice(0, 10).forEach((faction) => {
+        embed.addFields({
+          name: `${faction.name} (ID: ${faction.id})`,
+          value: `Members: ${faction.memberCount || 0} | War Points: ${
+            faction.warPoints || 0
+          }`,
+          inline: false,
+        });
+      });
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error("Error in handleListFactions:", error);
+      await interaction.editReply({
+        content: "Error fetching factions.",
+      });
+    }
+  }
+
   private async handleJoinFaction(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      if (user.factionId) {
+        await interaction.editReply({
+          content: "You are already in a faction!",
+        });
         return;
       }
-      
-      const factionId = interaction.options.getInteger('faction_id');
+
+      const factionId = interaction.options.getInteger("faction_id");
       const faction = await storage.getFactionById(factionId);
-      
+
       if (!faction) {
-        await interaction.reply({ content: `Faction not found.`, ephemeral: true });
+        await interaction.editReply({
+          content: "Faction not found.",
+        });
         return;
       }
-      
-      await storage.updateUser(user.id, { 
-        factionId: faction.id,
-        factionRank: 'Member'
-      });
-      
+
+      await storage.joinFaction(user.id, faction.id, "Member");
+
       const embed = new EmbedBuilder()
-        .setTitle('🏛️ Faction Joined')
+        .setTitle("🏛️ Faction Joined")
         .setDescription(`You have joined ${faction.name}!`)
-        .setColor(0x00D4FF)
+        .setColor(0x00d4ff)
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error joining faction.', ephemeral: true });
+      console.error("Error in handleJoinFaction:", error);
+      await interaction.editReply({
+        content: "Error joining faction.",
+      });
     }
   }
-  
+
   private async handleLeaveFaction(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       if (!user.factionId) {
-        await interaction.reply({ content: 'You are not in a faction.', ephemeral: true });
+        await interaction.editReply({
+          content: "You are not in a faction.",
+        });
         return;
       }
-      
+
       const faction = await storage.getFactionById(user.factionId);
-      await storage.updateUser(user.id, { factionId: null, factionRank: null });
-      
+      await storage.leaveFaction(user.id);
+
       const embed = new EmbedBuilder()
-        .setTitle('🏛️ Faction Left')
-        .setDescription(`You have left ${faction?.name || 'the faction'}.`)
-        .setColor(0xFF4444)
+        .setTitle("🏛️ Faction Left")
+        .setDescription(`You have left ${faction?.name || "the faction"}.`)
+        .setColor(0xff4444)
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error leaving faction.', ephemeral: true });
+      console.error("Error in handleLeaveFaction:", error);
+      await interaction.editReply({
+        content: "Error leaving faction.",
+      });
     }
   }
-  
+
   private async handleFactionInfo(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       if (!user.factionId) {
-        await interaction.reply({ content: 'You are not in a faction.', ephemeral: true });
+        await interaction.editReply({
+          content: "You are not in a faction.",
+        });
         return;
       }
-      
+
       const faction = await storage.getFactionById(user.factionId);
       if (!faction) {
-        await interaction.reply({ content: 'Faction not found.', ephemeral: true });
+        await interaction.editReply({
+          content: "Faction not found.",
+        });
         return;
       }
-      
+
       const embed = new EmbedBuilder()
         .setTitle(`🏛️ ${faction.name}`)
-        .setDescription(faction.description || 'No description provided')
-        .setColor(0x00D4FF)
+        .setDescription(faction.description || "No description provided")
+        .setColor(0x00d4ff)
         .addFields(
-          { name: 'War Points', value: (faction.warPoints || 0).toString(), inline: true },
-          { name: 'Your Rank', value: user.factionRank || 'Member', inline: true }
+          {
+            name: "Members",
+            value: (faction.memberCount || 0).toString(),
+            inline: true,
+          },
+          {
+            name: "War Points",
+            value: (faction.warPoints || 0).toString(),
+            inline: true,
+          },
+          {
+            name: "Your Rank",
+            value: user.factionRank || "Member",
+            inline: true,
+          }
         )
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error fetching faction info.', ephemeral: true });
+      console.error("Error in handleFactionInfo:", error);
+      await interaction.editReply({
+        content: "Error fetching faction info.",
+      });
     }
   }
-  
+
   private async handleShopCommand(interaction: any) {
     try {
+      await interaction.deferReply();
       const items = await storage.getItems();
-      
+
       const embed = new EmbedBuilder()
-        .setTitle('🏪 Cultivation Shop')
-        .setDescription('Purchase items with Void Crystals')
-        .setColor(0x00D4FF);
-      
+        .setTitle("🏪 Cultivation Shop")
+        .setDescription("Purchase items with Void Crystals")
+        .setColor(0x00d4ff);
+
       if (items.length === 0) {
-        embed.setDescription('Shop is empty!');
+        embed.setDescription("Shop is empty!");
       } else {
-        items.slice(0, 10).forEach(item => {
+        items.slice(0, 10).forEach((item) => {
           embed.addFields({
             name: `${item.name} (ID: ${item.id}) - ${item.rarity}`,
-            value: `${item.description || 'No description'}\n💎 Price: ${item.price}`,
-            inline: false
+            value: `${item.description || "No description"}\n💎 Price: ${
+              item.price
+            }`,
+            inline: false,
           });
         });
       }
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error fetching shop.', ephemeral: true });
+      console.error("Error in handleShopCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching shop.",
+      });
     }
   }
-  
+
   private async handleBuyCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
-      const itemId = interaction.options.getInteger('item_id');
-      const quantity = interaction.options.getInteger('quantity') || 1;
-      
-      const item = await storage.getItem(itemId);
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      const itemId = interaction.options.getInteger("item_id");
+      const quantity = interaction.options.getInteger("quantity") || 1;
+
+      const item = await storage.getItemById(itemId);
       if (!item) {
-        await interaction.reply({ content: 'Item not found.', ephemeral: true });
+        await interaction.editReply({
+          content: "Item not found.",
+        });
         return;
       }
-      
+
       const totalCost = item.price * quantity;
       if (user.voidCrystals < totalCost) {
-        await interaction.reply({ content: 'Not enough void crystals!', ephemeral: true });
+        await interaction.editReply({
+          content: `You need ${totalCost} void crystals, but only have ${user.voidCrystals}.`,
+        });
         return;
       }
-      
-      await storage.updateUser(user.id, { voidCrystals: user.voidCrystals - totalCost });
-      await storage.addUserItem(user.id, itemId, quantity);
-      
+
+      await storage.updateUser(user.id, {
+        voidCrystals: user.voidCrystals - totalCost,
+      } as any);
+      await storage.addItemToUser(user.id, itemId, quantity);
+
       const embed = new EmbedBuilder()
-        .setTitle('✅ Purchase Successful')
+        .setTitle("✅ Purchase Successful")
         .setDescription(`You purchased ${quantity}x ${item.name}`)
-        .setColor(0x00FF88)
-        .addFields(
-          { name: 'Cost', value: `-${totalCost} void crystals`, inline: true },
-          { name: 'Remaining', value: `${user.voidCrystals - totalCost} void crystals`, inline: true }
-        )
+        .setColor(0x00ff88)
+        .addFields({
+          name: "Cost",
+          value: `-${totalCost} void crystals`,
+          inline: true,
+        })
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error purchasing item.', ephemeral: true });
+      console.error("Error in handleBuyCommand:", error);
+      await interaction.editReply({
+        content: "Error purchasing item.",
+      });
     }
   }
-  
+
   private async handleInventoryCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       const items = await storage.getUserItems(user.id);
-      
+
       const embed = new EmbedBuilder()
-        .setTitle('🎒 Your Inventory')
-        .setColor(0x00D4FF);
-      
+        .setTitle("🎒 Your Inventory")
+        .setColor(0x00d4ff);
+
       if (items.length === 0) {
-        embed.setDescription('Your inventory is empty. Visit the shop to purchase items!');
+        embed.setDescription("Your inventory is empty!");
       } else {
-        items.forEach((userItem: any) => {
+        items.slice(0, 10).forEach((userItem) => {
           embed.addFields({
-            name: `${userItem.item.name} ${userItem.isEquipped ? '(Equipped)' : ''}`,
-            value: `${userItem.item.description || 'No description'}\nQuantity: ${userItem.quantity}`,
-            inline: true
+            name: `${userItem.item.name} (ID: ${userItem.item.id})`,
+            value: `Quantity: ${userItem.quantity} | Equipped: ${
+              userItem.isEquipped ? "Yes" : "No"
+            } | Rarity: ${userItem.item.rarity}`,
+            inline: false,
           });
         });
       }
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error fetching inventory.', ephemeral: true });
+      console.error("Error in handleInventoryCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching inventory.",
+      });
     }
   }
-  
+
   private async handleEquipCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      const itemId = interaction.options.getInteger("item_id");
+      const userItems = await storage.getUserItems(user.id);
+      const userItem = userItems.find((ui) => ui.item.id === itemId);
+
+      if (!userItem) {
+        await interaction.editReply({
+          content: "Item not found in your inventory.",
+        });
         return;
       }
-      
-      const itemId = interaction.options.getInteger('item_id');
+
       await storage.equipItem(user.id, itemId);
-      
+
       const embed = new EmbedBuilder()
-        .setTitle('✅ Item Equipped')
-        .setColor(0x00FF88)
+        .setTitle("✅ Item Equipped")
+        .setDescription(`You equipped ${userItem.item.name}`)
+        .setColor(0x00ff88)
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error equipping item.', ephemeral: true });
+      console.error("Error in handleEquipCommand:", error);
+      await interaction.editReply({
+        content: "Error equipping item.",
+      });
     }
   }
-  
+
   private async handleMissionsCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       const missions = await storage.getUserMissions(user.id);
-      const activeMissions = missions.filter((m: any) => m.status === 'active');
-      
+
       const embed = new EmbedBuilder()
-        .setTitle('📋 Your Missions')
-        .setColor(0x00D4FF);
-      
-      if (activeMissions.length === 0) {
-        embed.setDescription('No active missions. New missions will be assigned automatically!');
+        .setTitle("📋 Your Missions")
+        .setColor(0x00d4ff);
+
+      if (missions.length === 0) {
+        embed.setDescription("You have no active missions!");
       } else {
-        activeMissions.forEach((userMission: any) => {
-          const mission = userMission.mission;
+        missions.slice(0, 10).forEach((userMission) => {
           embed.addFields({
-            name: `${mission.title} (${mission.type})`,
-            value: `${mission.description || 'No description'}\n⭐ XP: ${mission.xpReward} | 💎 Reward: ${mission.crystalReward}`,
-            inline: false
+            name: `${userMission.mission.title} (ID: ${userMission.mission.id})`,
+            value: `Status: ${userMission.status} | XP Reward: ${
+              userMission.mission.xpReward
+            } | Crystal Reward: ${userMission.mission.crystalReward}`,
+            inline: false,
           });
         });
       }
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error fetching missions.', ephemeral: true });
+      console.error("Error in handleMissionsCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching missions.",
+      });
     }
   }
-  
+
   private async handleCompleteMissionCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      const missionId = interaction.options.getInteger("mission_id");
+      const userMissions = await storage.getUserMissions(user.id);
+      const userMission = userMissions.find(
+        (um) => um.mission.id === missionId
+      );
+
+      if (!userMission) {
+        await interaction.editReply({
+          content: "Mission not found.",
+        });
         return;
       }
-      
-      const missionId = interaction.options.getInteger('mission_id');
+
       await storage.completeMission(user.id, missionId);
-      
+
+      await storage.updateUser(user.id, {
+        xp: user.xp + userMission.mission.xpReward,
+        voidCrystals:
+          user.voidCrystals + userMission.mission.crystalReward,
+      } as any);
+
       const embed = new EmbedBuilder()
-        .setTitle('✅ Mission Completed!')
-        .setColor(0x00FF88)
+        .setTitle("✅ Mission Completed")
+        .setDescription(`${userMission.mission.title}`)
+        .setColor(0x00ff88)
+        .addFields(
+          {
+            name: "XP Reward",
+            value: `+${userMission.mission.xpReward}`,
+            inline: true,
+          },
+          {
+            name: "Crystal Reward",
+            value: `+${userMission.mission.crystalReward}`,
+            inline: true,
+          }
+        )
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error completing mission.', ephemeral: true });
+      console.error("Error in handleCompleteMissionCommand:", error);
+      await interaction.editReply({
+        content: "Error completing mission.",
+      });
     }
   }
-  
+
   private async handleLeaderboardCommand(interaction: any) {
     try {
-      const sortBy = interaction.options.getString('sort_by') || 'realm';
-      const leaderboard = await storage.getLeaderboard(interaction.guild.id, 10);
-      
+      await interaction.deferReply();
+      const leaderboard = await storage.getLeaderboard(
+        interaction.guild.id,
+        15
+      );
+
       const embed = new EmbedBuilder()
-        .setTitle('🏆 Cultivation Leaderboard')
-        .setColor(0xFFD700)
-        .setDescription(`Top 10 Cultivators by ${sortBy}`);
-      
+        .setTitle("📊 Cultivation Leaderboard")
+        .setColor(0x00d4ff);
+
       if (leaderboard.length === 0) {
-        embed.setDescription('No cultivators yet!');
+        embed.setDescription("No cultivators yet!");
       } else {
-        leaderboard.forEach((user: any, index: number) => {
+        leaderboard.forEach((user, index) => {
           embed.addFields({
-            name: `${index + 1}. ${user.username}`,
-            value: `${user.realm} - Level ${user.level}\n💎 Crystals: ${user.voidCrystals}`,
-            inline: false
+            name: `#${index + 1} ${user.username}`,
+            value: `${user.realm || "Connate Realm"} Lvl ${
+              user.level
+            } | Crystals: ${user.voidCrystals} | Rebirths: ${user.rebirthCount}`,
+            inline: false,
           });
         });
       }
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error fetching leaderboard.', ephemeral: true });
-    }
-  }
-  
-  private async handleRebirthCommand(interaction: any) {
-    try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
-      const currentRealmIndex = cultivationRealms.indexOf(user.realm as any);
-      if (currentRealmIndex < 10) {
-        await interaction.reply({ content: 'You must reach at least the Dao Realm to rebirth!', ephemeral: true });
-        return;
-      }
-      
-      const bonus = Math.floor(user.voidCrystals * 0.1);
-      
-      await storage.updateUser(user.id, {
-        level: 1,
-        xp: 0,
-        realm: 'Connate Realm',
-        voidCrystals: Math.floor(user.voidCrystals * 1.5),
-        rebirthCount: user.rebirthCount + 1,
+      console.error("Error in handleLeaderboardCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching leaderboard.",
       });
-      
-      const embed = new EmbedBuilder()
-        .setTitle('🔄 Rebirth Complete!')
-        .setDescription('You have been reborn with enhanced power!')
-        .setColor(0xFF00FF)
-        .addFields(
-          { name: 'Bonus Crystals', value: `+${bonus}`, inline: true },
-          { name: 'Rebirth Count', value: (user.rebirthCount + 1).toString(), inline: true },
-          { name: 'Starting Realm', value: 'Connate Realm', inline: true }
-        )
-        .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      await interaction.reply({ content: 'Error during rebirth.', ephemeral: true });
     }
   }
-  
-  private async handleStatsCommand(interaction: any) {
-    try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
-      const embed = new EmbedBuilder()
-        .setTitle(`📊 ${user.username}'s Detailed Stats`)
-        .setColor(0x00D4FF)
-        .addFields(
-          { name: '🏔️ Current Realm', value: user.realm, inline: false },
-          { name: '📈 Level', value: user.level.toString(), inline: true },
-          { name: '⭐ Rank', value: user.rank, inline: true },
-          { name: 'XP', value: `${user.xp} / ${100 * user.level}`, inline: true },
-          { name: '💎 Void Crystals', value: user.voidCrystals.toString(), inline: true },
-          { name: '✨ Spirit Points', value: user.spiritPoints.toString(), inline: true },
-          { name: '🌙 Karma', value: user.karma.toString(), inline: true },
-          { name: '🎯 Fate', value: user.fate.toString(), inline: true },
-          { name: '🔄 Rebirths', value: user.rebirthCount.toString(), inline: true },
-          { name: '👤 Premium', value: user.isPremium ? 'Yes' : 'No', inline: true }
-        )
-        .setThumbnail(user.avatar || interaction.user.displayAvatarURL())
-        .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      await interaction.reply({ content: 'Error fetching stats.', ephemeral: true });
-    }
-  }
-  
+
   private async handleBloodlineCommand(interaction: any) {
     try {
-      const user = await storage.getUserByDiscordId(interaction.user.id);
-      if (!user) {
-        await interaction.reply({ content: 'You are not registered.', ephemeral: true });
-        return;
-      }
-      
-      let bloodlineInfo = 'No bloodline';
-      if (user.bloodlineId) {
-        const bloodline = await storage.getBloodline(user.bloodlineId);
-        bloodlineInfo = bloodline?.name || 'Unknown Bloodline';
-      }
-      
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
       const embed = new EmbedBuilder()
-        .setTitle(`🧬 ${user.username}'s Bloodline`)
-        .setColor(0xFF00FF)
-        .setDescription(bloodlineInfo)
-        .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      await interaction.reply({ content: 'Error fetching bloodline.', ephemeral: true });
-    }
-  }
-  
-  private async handleTradeCommand(interaction: any) {
-    try {
-      const embed = new EmbedBuilder()
-        .setTitle('🔄 Trade Initiated')
-        .setDescription('Trading system coming soon!')
-        .setColor(0x00D4FF)
-        .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      await interaction.reply({ content: 'Error initiating trade.', ephemeral: true });
-    }
-  }
-  
-  private async handleSectMasterCommand(interaction: any) {
-    const subcommand = interaction.options.getSubcommand();
-    
-    switch (subcommand) {
-      case 'grant':
-        await this.handleGrantCommand(interaction);
-        break;
-      case 'banish':
-        await this.handleBanishCommand(interaction);
-        break;
-      case 'event':
-        await this.handleStartEvent(interaction);
-        break;
-    }
-  }
-  
-  private async handleGrantCommand(interaction: any) {
-    try {
-      const targetUser = interaction.options.getUser('user');
-      const levels = interaction.options.getInteger('levels');
-      
-      const user = await storage.getUserByDiscordId(targetUser.id);
-      if (!user) {
-        await interaction.reply({ content: 'User not found.', ephemeral: true });
-        return;
+        .setTitle("🧬 Bloodline")
+        .setColor(0x00d4ff);
+
+      if (!user.bloodlineId) {
+        embed.setDescription("You have not awakened a bloodline yet!");
+      } else {
+        const bloodline = await storage.getBloodlineById(user.bloodlineId);
+        if (bloodline) {
+          embed
+            .setTitle(`🧬 ${bloodline.name}`)
+            .setDescription(bloodline.description || "No description")
+            .addFields(
+              {
+                name: "Rarity",
+                value: bloodline.rarity,
+                inline: true,
+              },
+              {
+                name: "Power Bonus",
+                value: bloodline.powerBonus.toString(),
+                inline: true,
+              },
+              {
+                name: "Defense Bonus",
+                value: bloodline.defenseBonus.toString(),
+                inline: true,
+              }
+            );
+        } else {
+          embed.setDescription("Bloodline not found!");
+        }
       }
-      
-      await storage.updateUser(user.id, {
-        level: user.level + levels,
-        xp: 0,
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error("Error in handleBloodlineCommand:", error);
+      await interaction.editReply({
+        content: "Error fetching bloodline.",
       });
-      
-      const embed = new EmbedBuilder()
-        .setTitle('⚡ Divine Grant!')
-        .setDescription(`The Sect Master has granted ${levels} levels to ${targetUser.username}!`)
-        .setColor(0x00FF88)
-        .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
-    } catch (error) {
-      await interaction.reply({ content: 'Error granting levels.', ephemeral: true });
     }
   }
-  
-  private async handleBanishCommand(interaction: any) {
+
+  private async handleLookCommand(interaction: any) {
     try {
-      const targetUser = interaction.options.getUser('user');
-      const user = await storage.getUserByDiscordId(targetUser.id);
-      
-      if (!user) {
-        await interaction.reply({ content: 'User not found.', ephemeral: true });
+      await interaction.deferReply();
+      const locations = [
+        "You see a peaceful valley with flowing rivers.",
+        "A misty mountain peak looms in the distance.",
+        "An ancient temple stands before you, shrouded in mystery.",
+        "Wild beasts roam the untamed wilderness around you.",
+        "A bustling city marketplace fills the air with sounds of commerce.",
+        "Celestial clouds drift lazily across the sky.",
+        "An ancient statue of an immortal sage stands weathered and wise.",
+        "A hidden treasure chest glimmers faintly in the darkness.",
+        "You hear the distant sound of a waterfall echoing through canyons.",
+        "A portal of shimmering light appears before you for a moment.",
+      ];
+
+      const location =
+        locations[Math.floor(Math.random() * locations.length)];
+
+      const embed = new EmbedBuilder()
+        .setTitle("👀 You Look Around")
+        .setDescription(location)
+        .setColor(0x00d4ff)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error("Error in handleLookCommand:", error);
+      await interaction.editReply({
+        content: "Error looking around.",
+      });
+    }
+  }
+
+  private async handleRebirthCommand(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const user = await this.getOrCreateUser(interaction);
+
+      const currentRealmIndex = cultivationRealms.indexOf(
+        user.realm as any
+      );
+
+      if (currentRealmIndex < 6) {
+        // Before Dao Realm
+        await interaction.editReply({
+          content: "You must reach Dao Realm or higher to rebirth!",
+        });
         return;
       }
-      
+
       await storage.updateUser(user.id, {
-        realm: 'Connate Realm',
+        rebirthCount: user.rebirthCount + 1,
+        realm: "Connate Realm",
         level: 1,
         xp: 0,
-        voidCrystals: 0,
-      });
-      
+        voidCrystals: user.voidCrystals + 500,
+        spiritPoints: user.spiritPoints + 100,
+      } as any);
+
       const embed = new EmbedBuilder()
-        .setTitle('⚡ Divine Punishment!')
-        .setDescription(`The Sect Master has banished ${targetUser.username} back to the Connate Realm!`)
-        .setColor(0xFF4444)
+        .setTitle("♻️ Rebirth Successful!")
+        .setDescription("You have been reborn to the beginning.")
+        .setColor(0x00d4ff)
+        .addFields(
+          {
+            name: "Rebirth Count",
+            value: (user.rebirthCount + 1).toString(),
+            inline: true,
+          },
+          {
+            name: "Bonus Crystals",
+            value: "+500",
+            inline: true,
+          },
+          {
+            name: "Bonus Spirit Points",
+            value: "+100",
+            inline: true,
+          }
+        )
         .setTimestamp();
-      
-      await interaction.reply({ embeds: [embed] });
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
-      await interaction.reply({ content: 'Error banishing user.', ephemeral: true });
+      console.error("Error in handleRebirthCommand:", error);
+      await interaction.editReply({
+        content: "Error during rebirth.",
+      });
     }
   }
-  
-  private async handleStartEvent(interaction: any) {
-    const eventType = interaction.options.getString('type');
-    
-    const embed = new EmbedBuilder()
-      .setTitle('🎉 Sect-Wide Event Started!')
-      .setColor(0x00FF88)
-      .setTimestamp();
-    
-    switch (eventType) {
-      case 'double_xp':
-        embed.setDescription('Double XP event is now active! All cultivation activities reward double XP for the next 24 hours!');
+
+  private async handleTradeCommand(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const embed = new EmbedBuilder()
+        .setTitle("🤝 Trading System")
+        .setDescription("Trading system is coming soon!")
+        .setColor(0x00d4ff)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+      console.error("Error in handleTradeCommand:", error);
+      await interaction.editReply({
+        content: "Error with trading.",
+      });
+    }
+  }
+
+  private async handleAdminCommand(interaction: any) {
+    // Check if user has admin permissions
+    if (
+      !interaction.memberPermissions.has(
+        PermissionFlagsBits.Administrator
+      )
+    ) {
+      await interaction.reply({
+        content: "You do not have permission to use admin commands.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const subcommand = interaction.options.getSubcommand();
+
+    switch (subcommand) {
+      case "config":
+        await this.handleAdminConfig(interaction);
         break;
-      case 'faction_war':
-        embed.setDescription('Faction War has begun! Factions can now battle for supremacy and war points!');
+      case "grant":
+        await this.handleAdminGrant(interaction);
         break;
-      case 'treasure_hunt':
-        embed.setDescription('Treasure Hunt event is active! Complete missions to find rare treasures!');
+      case "banish":
+        await this.handleAdminBanish(interaction);
+        break;
+      case "event":
+        await this.handleAdminEvent(interaction);
+        break;
+      case "add_item":
+        await this.handleAdminAddItem(interaction);
+        break;
+      case "add_mission":
+        await this.handleAdminAddMission(interaction);
         break;
     }
-    
-    await interaction.reply({ embeds: [embed] });
   }
-  
+
+  private async handleAdminConfig(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const setting = interaction.options.getString("setting");
+      const value = interaction.options.getString("value");
+
+      let settings = await storage.getServerSettings(interaction.guild.id);
+
+      if (!settings) {
+        settings = await storage.updateServerSettings(interaction.guild.id, {
+          serverId: interaction.guild.id,
+        } as any);
+      }
+
+      let updated = false;
+      if (setting === "xp_multiplier") {
+        const multiplier = parseFloat(value);
+        if (multiplier > 0) {
+          await storage.updateServerSettings(interaction.guild.id, {
+            xpMultiplier: multiplier.toString() as any,
+          } as any);
+          updated = true;
+        }
+      }
+
+      if (updated) {
+        await interaction.editReply({
+          content: `✅ Updated ${setting} to ${value}`,
+        });
+      } else {
+        await interaction.editReply({
+          content: "Invalid setting or value.",
+        });
+      }
+    } catch (error) {
+      console.error("Error in handleAdminConfig:", error);
+      await interaction.editReply({
+        content: "Error updating config.",
+      });
+    }
+  }
+
+  private async handleAdminGrant(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const targetUser = interaction.options.getUser("user");
+      const levels = interaction.options.getInteger("levels");
+
+      const user = await storage.getUserByDiscordId(
+        targetUser.id,
+        interaction.guild.id
+      );
+
+      if (!user) {
+        await interaction.editReply({
+          content: "User not found.",
+        });
+        return;
+      }
+
+      await storage.updateUser(user.id, {
+        level: Math.min(user.level + levels, 9),
+      } as any);
+
+      await interaction.editReply({
+        content: `✅ Granted ${levels} levels to ${targetUser.username}`,
+      });
+    } catch (error) {
+      console.error("Error in handleAdminGrant:", error);
+      await interaction.editReply({
+        content: "Error granting levels.",
+      });
+    }
+  }
+
+  private async handleAdminBanish(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const targetUser = interaction.options.getUser("user");
+
+      const user = await storage.getUserByDiscordId(
+        targetUser.id,
+        interaction.guild.id
+      );
+
+      if (!user) {
+        await interaction.editReply({
+          content: "User not found.",
+        });
+        return;
+      }
+
+      await storage.updateUser(user.id, {
+        realm: "Connate Realm",
+        level: 1,
+        xp: 0,
+      } as any);
+
+      await interaction.editReply({
+        content: `✅ Banished ${targetUser.username} back to Connate Realm`,
+      });
+    } catch (error) {
+      console.error("Error in handleAdminBanish:", error);
+      await interaction.editReply({
+        content: "Error banishing user.",
+      });
+    }
+  }
+
+  private async handleAdminEvent(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const eventType = interaction.options.getString("type");
+
+      let message = "";
+      switch (eventType) {
+        case "double_xp":
+          message =
+            "🎉 A mystical power doubles all XP gains! The Heavens favor your cultivation!";
+          break;
+        case "triple_crystals":
+          message =
+            "💎 The Void trembles! All void crystal rewards tripled for the next hour!";
+          break;
+        case "faction_war":
+          message =
+            "⚔️ FACTION WAR BEGINS! All factions compete for dominance and glory!";
+          break;
+        case "treasure_hunt":
+          message =
+            "🗺️ A legendary treasure hunt begins! Hidden treasures await the worthy!";
+          break;
+      }
+
+      await interaction.editReply({
+        content: `✅ Event started: ${message}`,
+      });
+    } catch (error) {
+      console.error("Error in handleAdminEvent:", error);
+      await interaction.editReply({
+        content: "Error starting event.",
+      });
+    }
+  }
+
+  private async handleAdminAddItem(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const name = interaction.options.getString("name");
+      const type = interaction.options.getString("type");
+      const price = interaction.options.getInteger("price");
+
+      await storage.createItem({
+        name,
+        type: type as any,
+        rarity: "common",
+        description: "Admin-created item",
+        price,
+        powerBonus: 0,
+        defenseBonus: 0,
+        agilityBonus: 0,
+        wisdomBonus: 0,
+      } as any);
+
+      await interaction.editReply({
+        content: `✅ Added item: ${name} (${type}) for ${price} void crystals`,
+      });
+    } catch (error) {
+      console.error("Error in handleAdminAddItem:", error);
+      await interaction.editReply({
+        content: "Error adding item.",
+      });
+    }
+  }
+
+  private async handleAdminAddMission(interaction: any) {
+    try {
+      await interaction.deferReply();
+      const title = interaction.options.getString("title");
+      const xpReward = interaction.options.getInteger("xp_reward");
+      const crystalReward = interaction.options.getInteger("crystal_reward");
+
+      await storage.createMission({
+        title,
+        description: "Admin-created mission",
+        type: "daily",
+        xpReward,
+        crystalReward,
+        isActive: true,
+        serverId: interaction.guild.id,
+      } as any);
+
+      await interaction.editReply({
+        content: `✅ Added mission: ${title} (${xpReward} XP, ${crystalReward} crystals)`,
+      });
+    } catch (error) {
+      console.error("Error in handleAdminAddMission:", error);
+      await interaction.editReply({
+        content: "Error adding mission.",
+      });
+    }
+  }
+
   public async start() {
     if (!this.TOKEN) {
-      console.error('❌ DISCORD_TOKEN not provided');
-      throw new Error('Discord bot token not provided');
+      console.error("❌ DISCORD_TOKEN not provided");
+      throw new Error("Discord bot token not provided");
     }
-    
-    console.log('🤖 Starting Discord Bot...');
+
+    console.log("🤖 Starting Discord Bot...");
     console.log(`🔑 Token: ${this.TOKEN.substring(0, 15)}...`);
-    
+
     await this.client.login(this.TOKEN);
   }
 }
