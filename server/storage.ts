@@ -1,11 +1,11 @@
 import { 
   users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
-  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures,
+  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
   type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
   type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
   type Battle, type InsertBattle, type Activity, type InsertActivity,
-  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure
+  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure, type Event, type EventParticipant
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, gte, lte, count, sql } from "drizzle-orm";
@@ -100,6 +100,15 @@ export interface IStorage {
   getRecentActivities(userId: number, limit?: number): Promise<Activity[]>;
   getServerActivities(serverId: string, limit?: number): Promise<(Activity & { user: User })[]>;
   
+  // Events operations
+  getEventsByServer(serverId: string): Promise<Event[]>;
+  getActiveEvents(serverId: string): Promise<Event[]>;
+  createEvent(event: any): Promise<Event>;
+  getEventById(id: number): Promise<Event | undefined>;
+  joinEvent(userId: number, eventId: number): Promise<EventParticipant>;
+  getEventParticipants(eventId: number): Promise<EventParticipant[]>;
+  updateEventParticipant(id: number, updates: Partial<EventParticipant>): Promise<EventParticipant>;
+
   // Server settings
   getServerSettings(serverId: string): Promise<ServerSettings | undefined>;
   updateServerSettings(serverId: string, updates: Partial<ServerSettings>): Promise<ServerSettings>;
@@ -577,6 +586,38 @@ export class DatabaseStorage implements IStorage {
       ...row.activities,
       user: row.users,
     }));
+  }
+
+  async getEventsByServer(serverId: string): Promise<Event[]> {
+    return await db.select().from(events).where(eq(events.serverId, serverId));
+  }
+
+  async getActiveEvents(serverId: string): Promise<Event[]> {
+    return await db.select().from(events).where(and(eq(events.serverId, serverId), eq(events.isActive, true)));
+  }
+
+  async createEvent(event: any): Promise<Event> {
+    const [newEvent] = await db.insert(events).values(event).returning();
+    return newEvent;
+  }
+
+  async getEventById(id: number): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    return event || undefined;
+  }
+
+  async joinEvent(userId: number, eventId: number): Promise<EventParticipant> {
+    const [participant] = await db.insert(eventParticipants).values({ userId, eventId }).returning();
+    return participant;
+  }
+
+  async getEventParticipants(eventId: number): Promise<EventParticipant[]> {
+    return await db.select().from(eventParticipants).where(eq(eventParticipants.eventId, eventId)).orderBy(desc(eventParticipants.score));
+  }
+
+  async updateEventParticipant(id: number, updates: Partial<EventParticipant>): Promise<EventParticipant> {
+    const [updated] = await db.update(eventParticipants).set(updates).where(eq(eventParticipants.id, id)).returning();
+    return updated;
   }
 
   async getServerSettings(serverId: string): Promise<ServerSettings | undefined> {

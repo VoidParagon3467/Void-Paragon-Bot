@@ -61,6 +61,9 @@ export class CultivationBot {
     // Daily resources distribution - every 24 hours
     setInterval(() => this.distributeDailyResources(), 24 * 60 * 60 * 1000);
     
+    // Hall of Fame leaderboards - daily
+    setInterval(() => this.postHallOfFameLeaderboards(), 24 * 60 * 60 * 1000);
+    
     // Auto-generate treasures every 6 hours
     setInterval(() => this.autoGenerateTreasures(), 6 * 60 * 60 * 1000);
     
@@ -85,6 +88,9 @@ export class CultivationBot {
     // Random events every 4 hours
     setInterval(() => this.triggerRandomEvent(), 4 * 60 * 60 * 1000);
     
+    // Daily events - trigger at midnight (TODO: Enable after database migration)
+    // setInterval(() => this.createDailyEvent(), 24 * 60 * 60 * 1000);
+    
     // Meditation XP gain every 1 minute
     setInterval(() => this.distributeMeditationXp(), 60 * 1000);
 
@@ -96,6 +102,8 @@ export class CultivationBot {
     this.autoGenerateTitles().catch(console.error);
     this.autoGenerateWeapons().catch(console.error);
     this.autoGenerateBloodlines().catch(console.error);
+    this.postHallOfFameLeaderboards().catch(console.error);
+    // this.createDailyEvent().catch(console.error);
   }
 
   private async distributeDailyResources() {
@@ -383,6 +391,132 @@ export class CultivationBot {
       }
     } catch (error) {
       console.error("Error generating breakthrough treasures:", error);
+    }
+  }
+
+  private async postHallOfFameLeaderboards() {
+    try {
+      console.log("🏆 Posting Hall of Fame leaderboards...");
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      for (const [serverId] of guilds) {
+        const users = await storage.getUsersInServer(serverId);
+        
+        // Filter: Outer, Inner, Core, Inheritor disciples (exclude Elders and above)
+        const discipleLevels = ["Outer Disciple", "Inner Disciple", "Core Disciple", "Inheritor Disciple"];
+        const disciples = users.filter(u => discipleLevels.includes(u.rank || "Outer Disciple"));
+        
+        // Sort by VC gained and create leaderboard
+        const vcLeaderboard = disciples.sort((a, b) => b.voidCrystals - a.voidCrystals).slice(0, 10);
+        const spLeaderboard = disciples.sort((a, b) => b.sectPoints - a.sectPoints).slice(0, 10);
+        const karmaLeaderboard = disciples.sort((a, b) => b.karma - a.karma).slice(0, 10);
+        
+        // Post to hall of fame channel
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (channels) {
+          let hallOfFameChannel = channels.find((c: any) => c.name === "hall-of-fame" || c.name === "sect-hall-of-fame") as any;
+          if (!hallOfFameChannel) {
+            hallOfFameChannel = channels.find((c: any) => c.isTextBased()) as any;
+          }
+          
+          if (hallOfFameChannel && 'send' in hallOfFameChannel) {
+            const embed = new EmbedBuilder()
+              .setTitle("🏆 SECT HALL OF FAME - Daily Leaderboards")
+              .setColor(0xffd700)
+              .addFields(
+                {
+                  name: "💎 Void Crystals",
+                  value: vcLeaderboard.map((u, i) => `${i + 1}. ${u.username}: ${u.voidCrystals}`).join("\n") || "No records",
+                  inline: true,
+                },
+                {
+                  name: "📖 Sect Points",
+                  value: spLeaderboard.map((u, i) => `${i + 1}. ${u.username}: ${u.sectPoints}`).join("\n") || "No records",
+                  inline: true,
+                },
+                {
+                  name: "✅ Karma",
+                  value: karmaLeaderboard.map((u, i) => `${i + 1}. ${u.username}: ${u.karma}`).join("\n") || "No records",
+                  inline: true,
+                }
+              )
+              .setTimestamp();
+            
+            await hallOfFameChannel.send({ embeds: [embed] }).catch(console.error);
+          }
+        }
+      }
+      console.log("✅ Hall of Fame leaderboards posted");
+    } catch (error) {
+      console.error("Error posting hall of fame:", error);
+    }
+  }
+
+  private async createDailyEvent() {
+    try {
+      console.log("🎲 Creating daily mini events...");
+      const eventNames = [
+        "Trial of Strength",
+        "Wisdom Challenge",
+        "Void Hunt",
+        "Celestial Race",
+        "Artifact Gathering",
+      ];
+      
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      for (const [serverId] of guilds) {
+        const eventName = eventNames[Math.floor(Math.random() * eventNames.length)];
+        const now = new Date();
+        const endsIn24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        
+        await storage.createEvent({
+          serverId,
+          type: "daily",
+          title: eventName,
+          description: `A daily ${eventName} challenge for all disciples!`,
+          entryCost: 0, // Free daily
+          entryCostType: "vc",
+          maxParticipants: 1000,
+          winnerCount: 10,
+          rewardPool: {
+            vc: Math.floor(Math.random() * 500) + 500, // 500-1000 VC to distribute
+            sp: Math.floor(Math.random() * 50) + 25, // 25-75 SP
+            bloodlines: 1,
+            weapons: 1,
+          },
+          startedAt: now,
+          endsAt: endsIn24h,
+        } as any);
+        
+        // Post to mini events channel
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (channels) {
+          let eventChannel = channels.find((c: any) => c.name === "mini-events" || c.name === "events") as any;
+          if (!eventChannel) {
+            eventChannel = channels.find((c: any) => c.isTextBased()) as any;
+          }
+          
+          if (eventChannel && 'send' in eventChannel) {
+            const embed = new EmbedBuilder()
+              .setTitle(`⚔️ ${eventName}`)
+              .setDescription("A new daily event has begun!")
+              .setColor(0xff6600)
+              .addFields(
+                { name: "Duration", value: "24 hours", inline: true },
+                { name: "Entry Cost", value: "Free", inline: true },
+                { name: "Rewards", value: "Void Crystals, Sect Points, Rare Items", inline: true },
+                { name: "Top Rewards", value: "Top 10 get bonus Legendary Weapons + Bloodlines!", inline: false }
+              )
+              .setTimestamp();
+            
+            await eventChannel.send({ embeds: [embed] }).catch(console.error);
+          }
+        }
+      }
+      console.log("✅ Daily events created");
+    } catch (error) {
+      console.error("Error creating daily events:", error);
     }
   }
 

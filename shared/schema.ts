@@ -306,10 +306,45 @@ export const serverSettings = pgTable("server_settings", {
   cultivationChannelId: text("cultivation_channel_id"),
   battleChannelId: text("battle_channel_id"),
   factionChannelId: text("faction_channel_id"),
+  // New channel IDs for features
+  hallOfFameChannelId: text("hall_of_fame_channel_id"), // Daily leaderboards
+  miniEventsChannelId: text("mini_events_channel_id"), // Event announcements
+  premiumRewardsChannelId: text("premium_rewards_channel_id"), // Paid items
   xpMultiplier: decimal("xp_multiplier").notNull().default("1.0"),
   premiumEnabled: boolean("premium_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Events table (daily, weekly, monthly, yearly)
+export const eventTypeEnum = pgEnum("event_type", ["daily", "weekly", "monthly", "yearly"]);
+
+export const events = pgTable("events", {
+  id: serial("id").primaryKey(),
+  serverId: text("server_id").notNull(),
+  type: eventTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  entryCost: integer("entry_cost").notNull().default(0), // VC for weekly, SP for monthly, Karma for yearly
+  entryCostType: text("entry_cost_type").notNull().default("vc"), // 'vc', 'sp', 'karma'
+  maxParticipants: integer("max_participants"),
+  winnerCount: integer("winner_count").notNull().default(10),
+  rewardPool: jsonb("reward_pool"), // Currencies and items to distribute
+  startedAt: timestamp("started_at").notNull(),
+  endsAt: timestamp("ends_at").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Event participants and results
+export const eventParticipants = pgTable("event_participants", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  userId: integer("user_id").notNull(),
+  score: integer("score").notNull().default(0),
+  placement: integer("placement"),
+  rewardClaimed: boolean("reward_claimed").notNull().default(false),
+  joinedAt: timestamp("joined_at").defaultNow(),
 });
 
 // Relations
