@@ -1172,6 +1172,35 @@ export class CultivationBot {
             .setDescription("Announcement message")
             .setRequired(true)
         ),
+
+      // Chapter announcement command for Jadescrolls novel
+      new SlashCommandBuilder()
+        .setName("post_chapter")
+        .setDescription("Post a new chapter from Peerless Immortal God (Sect Master only)")
+        .addStringOption((option) =>
+          option
+            .setName("title")
+            .setDescription("Chapter title (e.g., 'The Journey Begins')")
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("url")
+            .setDescription("Link to the chapter on Jadescrolls")
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("chapter_number")
+            .setDescription("Chapter number")
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("cover_image")
+            .setDescription("URL to chapter cover image (optional)")
+            .setRequired(false)
+        ),
     ];
 
     this.client.on("ready", async () => {
@@ -1377,6 +1406,9 @@ export class CultivationBot {
           break;
         case "sect_announcement":
           await this.handleSectAnnouncementCommand(interaction);
+          break;
+        case "post_chapter":
+          await this.handlePostChapterCommand(interaction);
           break;
         default:
           await interaction.reply({
@@ -2698,6 +2730,119 @@ export class CultivationBot {
       console.error("Error in handleSectAnnouncementCommand:", error);
       await interaction.editReply({
         content: "Error sending announcement.",
+      });
+    }
+  }
+
+  private async handlePostChapterCommand(interaction: any) {
+    try {
+      const user = await storage.getUserByDiscordId(
+        interaction.user.id,
+        interaction.guild.id
+      );
+
+      // Only Supreme Sect Master can use this
+      if (!user || !user.isSupremeSectMaster) {
+        await interaction.reply({
+          content: "❌ Only the Supreme Sect Master can use this command!",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply();
+      
+      const chapterTitle = interaction.options.getString("title");
+      const chapterUrl = interaction.options.getString("url");
+      const chapterNumber = interaction.options.getInteger("chapter_number");
+      const coverImage = interaction.options.getString("cover_image");
+
+      const channels = interaction.guild.channels.cache;
+      
+      // Find announcement channel
+      let announcementChannel = channels.find(
+        (c: any) => c.name === "announcements" || c.name === "announcement"
+      ) as any;
+      if (!announcementChannel) {
+        announcementChannel = channels.find((c: any) => c.name === "general") as any;
+      }
+
+      // Find discussion channel (peerless immortal god)
+      let discussionChannel = channels.find(
+        (c: any) => c.name.toLowerCase().includes("peerless") || c.name.toLowerCase().includes("immortal")
+      ) as any;
+      if (!discussionChannel && announcementChannel) {
+        discussionChannel = announcementChannel;
+      }
+
+      let postedCount = 0;
+
+      // Post to announcement channel
+      if (announcementChannel && "send" in announcementChannel) {
+        const embed = new EmbedBuilder()
+          .setTitle(`📖 New Chapter Released: ${chapterTitle}`)
+          .setDescription(`**Peerless Immortal God** - Chapter ${chapterNumber}`)
+          .setURL(chapterUrl)
+          .setColor(0xffd700)
+          .addFields({
+            name: "Read Now",
+            value: `[Open Chapter on Jadescrolls](${chapterUrl})`,
+            inline: true,
+          })
+          .setTimestamp();
+
+        if (coverImage) {
+          embed.setThumbnail(coverImage);
+        }
+
+        await announcementChannel.send({ embeds: [embed] });
+        postedCount++;
+      }
+
+      // Post to discussion channel if different
+      if (discussionChannel && discussionChannel.id !== announcementChannel?.id && "send" in discussionChannel) {
+        const discussionEmbed = new EmbedBuilder()
+          .setTitle(`💬 Discussion: ${chapterTitle}`)
+          .setDescription(`**Peerless Immortal God** - Chapter ${chapterNumber}\n\nWhat did you think of this chapter? Share your thoughts!`)
+          .setURL(chapterUrl)
+          .setColor(0x9966ff)
+          .addFields({
+            name: "Read Now",
+            value: `[Open Chapter on Jadescrolls](${chapterUrl})`,
+            inline: true,
+          })
+          .setTimestamp();
+
+        if (coverImage) {
+          discussionEmbed.setThumbnail(coverImage);
+        }
+
+        await discussionChannel.send({ embeds: [discussionEmbed] });
+        postedCount++;
+      }
+
+      const channelsList = postedCount === 2 
+        ? "announcement and discussion channels"
+        : postedCount === 1
+        ? "announcement channel"
+        : "channels";
+
+      await interaction.editReply({
+        content: `✅ Chapter posted to ${channelsList}! 📖\n\n**${chapterTitle}** (Chapter ${chapterNumber})`,
+      });
+
+      // Log the event
+      await this.logBotEvent(interaction.guild.id, "Commands", "📖 Chapter announcement posted", {
+        chapter: chapterNumber,
+        title: chapterTitle,
+        url: chapterUrl,
+        channelsPosted: postedCount,
+        user: interaction.user.tag,
+      });
+    } catch (error) {
+      console.error("Error in handlePostChapterCommand:", error);
+      await interaction.editReply({
+        content: "❌ Error posting chapter announcement.",
       });
     }
   }
