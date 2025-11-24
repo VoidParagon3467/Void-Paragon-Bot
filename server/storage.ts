@@ -1,6 +1,6 @@
 import { 
   users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
-  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants,
+  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
   type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
   type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
@@ -108,6 +108,12 @@ export interface IStorage {
   joinEvent(userId: number, eventId: number): Promise<EventParticipant>;
   getEventParticipants(eventId: number): Promise<EventParticipant[]>;
   updateEventParticipant(id: number, updates: Partial<EventParticipant>): Promise<EventParticipant>;
+
+  // Premium operations
+  createPremiumPurchase(purchase: any): Promise<any>;
+  getPremiumPurchases(userId: number): Promise<any[]>;
+  getCompletedPremiumPurchases(serverId: string): Promise<any[]>;
+  updatePremiumPurchase(id: number, updates: any): Promise<any>;
 
   // Server settings
   getServerSettings(serverId: string): Promise<ServerSettings | undefined>;
@@ -617,6 +623,26 @@ export class DatabaseStorage implements IStorage {
 
   async updateEventParticipant(id: number, updates: Partial<EventParticipant>): Promise<EventParticipant> {
     const [updated] = await db.update(eventParticipants).set(updates).where(eq(eventParticipants.id, id)).returning();
+    return updated;
+  }
+
+  async createPremiumPurchase(purchase: any): Promise<any> {
+    const [newPurchase] = await db.insert(premiumPurchases).values(purchase).returning();
+    return newPurchase;
+  }
+
+  async getPremiumPurchases(userId: number): Promise<any[]> {
+    return await db.select().from(premiumPurchases).where(eq(premiumPurchases.userId, userId));
+  }
+
+  async getCompletedPremiumPurchases(serverId: string): Promise<any[]> {
+    return await db.select().from(premiumPurchases)
+      .where(and(eq(premiumPurchases.serverId, serverId), eq(premiumPurchases.status, "completed")))
+      .orderBy(desc(premiumPurchases.completedAt));
+  }
+
+  async updatePremiumPurchase(id: number, updates: any): Promise<any> {
+    const [updated] = await db.update(premiumPurchases).set(updates).where(eq(premiumPurchases.id, id)).returning();
     return updated;
   }
 

@@ -165,6 +165,9 @@ export class CultivationBot {
     // Hall of Fame leaderboards - daily
     setInterval(() => this.postHallOfFameLeaderboards(), 24 * 60 * 60 * 1000);
     
+    // Premium Rewards posting - daily showcase
+    setInterval(() => this.postPremiumRewards(), 24 * 60 * 60 * 1000);
+    
     // Auto-generate treasures every 6 hours
     setInterval(() => this.autoGenerateTreasures(), 6 * 60 * 60 * 1000);
     
@@ -204,7 +207,60 @@ export class CultivationBot {
     this.autoGenerateWeapons().catch(console.error);
     this.autoGenerateBloodlines().catch(console.error);
     this.postHallOfFameLeaderboards().catch(console.error);
+    this.postPremiumRewards().catch(console.error);
     // this.createDailyEvent().catch(console.error);
+  }
+
+  private async postPremiumRewards() {
+    try {
+      console.log("💎 Posting daily premium rewards showcase...");
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      const premiumItems = [
+        { name: "Mythical Bloodline", rarity: "Legendary", price: "£89.99", desc: "Ultimate bloodline with 10x power boost" },
+        { name: "Divine Phoenix Body", rarity: "Epic", price: "£49.99", desc: "Legendary divine body granting immortality" },
+        { name: "Heaven's Sword", rarity: "Legendary", price: "£79.99", desc: "Weapon capable of splitting the heavens" },
+        { name: "Eternal Dao", rarity: "Epic", price: "£59.99", desc: "Comprehend the eternal principles of cultivation" },
+        { name: "Immortal Treasure", rarity: "Legendary", price: "£99.99", desc: "Legendary breakthrough treasure - instant level 9!" }
+      ];
+      
+      for (const [serverId] of guilds) {
+        const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
+        if (!channels) continue;
+        
+        let premiumChannel = channels.find((c: any) => c.name === "premium-rewards" || c.name === "premium") as any;
+        if (!premiumChannel) {
+          premiumChannel = channels.find((c: any) => c.name === "announcements" || c.name === "general") as any;
+        }
+        
+        if (premiumChannel && 'send' in premiumChannel) {
+          const randomItems = premiumItems.sort(() => 0.5 - Math.random()).slice(0, 3);
+          
+          const embed = new EmbedBuilder()
+            .setTitle("💎 PREMIUM REWARDS - Legendary Items")
+            .setDescription("Unlock exclusive premium items to accelerate your cultivation!\n*All purchases processed securely via payment provider*")
+            .setColor(0xff00ff)
+            .addFields(
+              ...randomItems.map(item => ({
+                name: `⭐ ${item.name} (${item.rarity})`,
+                value: `${item.desc}\n💷 **${item.price} GBP**\n*Type /premium to purchase*`,
+                inline: false
+              }))
+            )
+            .addFields({
+              name: "🔐 Payment Info",
+              value: "Secure payments via payment processor\nAccount: hajara kana suleiman\nBank: Clear Junction Limited\n*Connect your Stripe/PayPal account to enable purchases*",
+              inline: false
+            })
+            .setTimestamp();
+          
+          await premiumChannel.send({ embeds: [embed] }).catch(console.error);
+        }
+      }
+      console.log("✅ Premium rewards posted");
+    } catch (error) {
+      console.error("Error posting premium rewards:", error);
+    }
   }
 
   private async distributeDailyResources() {

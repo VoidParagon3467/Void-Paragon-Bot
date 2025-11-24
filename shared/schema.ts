@@ -348,6 +348,23 @@ export const eventParticipants = pgTable("event_participants", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
+// Premium purchases and transactions
+export const premiumPurchases = pgTable("premium_purchases", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  itemType: text("item_type").notNull(), // 'bloodline', 'divine_body', 'dao', 'weapon', 'treasure'
+  itemId: integer("item_id"),
+  itemName: text("item_name").notNull(),
+  rarity: rarityEnum("rarity").notNull(),
+  priceGBP: decimal("price_gbp").notNull(), // Price in GBP
+  currency: text("currency").notNull().default("GBP"),
+  status: text("status").notNull().default("pending"), // 'pending', 'completed', 'failed', 'refunded'
+  transactionId: text("transaction_id"), // External payment processor ID
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  serverId: text("server_id").notNull(),
+});
+
 // Relations
 export const userRelations = relations(users, ({ one, many }) => ({
   bloodline: one(bloodlines, {
