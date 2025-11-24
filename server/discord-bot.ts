@@ -30,6 +30,11 @@ export class CultivationBot {
     this.setupCommands();
   }
 
+  // Public getter for client (needed for routes)
+  get getClient(): Client {
+    return this.client;
+  }
+
   // Comprehensive bot logging system
   private async logBotEvent(serverId: string, category: string, message: string, details?: any) {
     try {

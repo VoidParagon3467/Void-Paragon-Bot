@@ -7,13 +7,18 @@ import { missionService } from "./missions";
 import { insertUserSchema, insertFactionSchema } from "@shared/schema";
 import { EmbedBuilder } from "discord.js";
 
+// Extend WebSocket type to include serverId
+interface ExtendedWebSocket extends WebSocket {
+  serverId?: string;
+}
+
 export async function registerRoutes(app: Express, botClient?: any): Promise<Server> {
   const httpServer = createServer(app);
   
   // WebSocket server for real-time updates
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws: ExtendedWebSocket) => {
     console.log('Client connected to WebSocket');
     
     ws.on('message', (message) => {
@@ -38,7 +43,7 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
   
   // Broadcast function for real-time updates
   const broadcast = (serverId: string, data: any) => {
-    wss.clients.forEach((client) => {
+    wss.clients.forEach((client: ExtendedWebSocket) => {
       if (client.readyState === WebSocket.OPEN && client.serverId === serverId) {
         client.send(JSON.stringify(data));
       }
@@ -95,9 +100,20 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       }
 
       if (discussionChannel && discussionChannel.id !== announcementChannel?.id && 'send' in discussionChannel) {
-        const discussionEmbed = embed.clone()
+        const discussionEmbed = new EmbedBuilder()
           .setTitle(`💬 Discussion: ${chapterTitle}`)
-          .setDescription(`**${novelName || "Peerless Immortal God"}** - Chapter ${chapterNumber || ""}\n\nWhat did you think of this chapter?`);
+          .setDescription(`**${novelName || "Peerless Immortal God"}** - Chapter ${chapterNumber || ""}\n\nWhat did you think of this chapter?`)
+          .setURL(chapterUrl)
+          .setColor(0x9966ff)
+          .addFields({
+            name: "Read Now",
+            value: `[Open Chapter](${chapterUrl})`,
+            inline: true
+          })
+          .setTimestamp();
+        if (coverImage) {
+          discussionEmbed.setThumbnail(coverImage);
+        }
         const msg = await discussionChannel.send({ embeds: [discussionEmbed] }).catch(console.error);
         if (msg) messages.push(msg);
       }
@@ -281,7 +297,9 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       
       if (result.success) {
         const user = await storage.getUserWithDetails(userId);
-        broadcast(user.serverId, { type: 'missionCompleted', user, mission: result.mission });
+        if (user) {
+          broadcast(user.serverId, { type: 'missionCompleted', user, mission: result.mission });
+        }
       }
       
       res.json(result);
@@ -297,7 +315,9 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       const result = await cultivationService.initiateBattle(attackerId, defenderId, "spar");
       
       const attacker = await storage.getUserWithDetails(attackerId);
-      broadcast(attacker.serverId, { type: 'battleResult', battle: result });
+      if (attacker) {
+        broadcast(attacker.serverId, { type: 'battleResult', battle: result });
+      }
       
       res.json(result);
     } catch (error) {
@@ -342,7 +362,9 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       
       if (result.success) {
         const user = await storage.getUserWithDetails(userId);
-        broadcast(user.serverId, { type: 'itemPurchased', user, item: result.item });
+        if (user) {
+          broadcast(user.serverId, { type: 'itemPurchased', user, item: result.item });
+        }
       }
       
       res.json(result);
