@@ -231,11 +231,15 @@ export class CultivationBot {
           } as any);
         }
 
-        // Announce in general or first text channel
+        // Announce in ANNOUNCEMENT channel specifically
         const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
         if (channels) {
-          const textChannel = channels.find((c: any) => c.isTextBased()) as any;
-          if (textChannel && 'send' in textChannel) {
+          let announcementChannel = channels.find((c: any) => c.name === "announcements" || c.name === "announcement") as any;
+          if (!announcementChannel) {
+            announcementChannel = channels.find((c: any) => c.name === "general") as any;
+          }
+          
+          if (announcementChannel && 'send' in announcementChannel) {
             const embed = new EmbedBuilder()
               .setTitle("🌅 Daily Resources Distributed!")
               .setDescription(`All cultivators have received their daily resources based on rank!`)
@@ -246,7 +250,7 @@ export class CultivationBot {
               })
               .setTimestamp();
 
-            await (textChannel as any).send({ embeds: [embed] }).catch(console.error);
+            await (announcementChannel as any).send({ embeds: [embed] }).catch(console.error);
           }
         }
       }
@@ -510,47 +514,86 @@ export class CultivationBot {
       for (const [serverId] of guilds) {
         const users = await storage.getUsersInServer(serverId);
         
-        // Filter: Outer, Inner, Core, Inheritor disciples (exclude Elders and above)
+        // DISCIPLES tier: Outer, Inner, Core, Inheritor (exclude Sect Master and Elders)
         const discipleLevels = ["Outer Disciple", "Inner Disciple", "Core Disciple", "Inheritor Disciple"];
-        const disciples = users.filter(u => discipleLevels.includes(u.rank || "Outer Disciple"));
+        const disciples = users.filter(u => 
+          discipleLevels.includes(u.rank || "Outer Disciple") && !u.isSupremeSectMaster
+        );
         
-        // Sort by VC gained and create leaderboard
-        const vcLeaderboard = disciples.sort((a, b) => b.voidCrystals - a.voidCrystals).slice(0, 10);
-        const spLeaderboard = disciples.sort((a, b) => b.sectPoints - a.sectPoints).slice(0, 10);
-        const karmaLeaderboard = disciples.sort((a, b) => b.karma - a.karma).slice(0, 10);
+        // ELDERS tier: Heavenly Elder, Great Elder, Elder (no Sect Master)
+        const elderLevels = ["Heavenly Elder", "Great Elder", "Elder"];
+        const elders = users.filter(u => 
+          elderLevels.includes(u.rank || "") && !u.isSupremeSectMaster
+        );
         
-        // Post to hall of fame channel
+        // Create top 10 leaderboards for each tier
+        const discipleVCTop10 = disciples.sort((a, b) => b.voidCrystals - a.voidCrystals).slice(0, 10);
+        const discipleSPTop10 = disciples.sort((a, b) => b.sectPoints - a.sectPoints).slice(0, 10);
+        const discipleKarmaTop10 = disciples.sort((a, b) => b.karma - a.karma).slice(0, 10);
+        
+        const elderVCTop10 = elders.sort((a, b) => b.voidCrystals - a.voidCrystals).slice(0, 10);
+        const elderSPTop10 = elders.sort((a, b) => b.sectPoints - a.sectPoints).slice(0, 10);
+        const elderKarmaTop10 = elders.sort((a, b) => b.karma - a.karma).slice(0, 10);
+        
         const channels = this.client.guilds.cache.get(serverId)?.channels.cache;
-        if (channels) {
-          let hallOfFameChannel = channels.find((c: any) => c.name === "hall-of-fame" || c.name === "sect-hall-of-fame") as any;
-          if (!hallOfFameChannel) {
-            hallOfFameChannel = channels.find((c: any) => c.isTextBased()) as any;
-          }
+        if (!channels) continue;
+        
+        let hallOfFameChannel = channels.find((c: any) => c.name === "hall-of-fame" || c.name === "sect-hall-of-fame") as any;
+        if (!hallOfFameChannel) {
+          hallOfFameChannel = channels.find((c: any) => c.isTextBased()) as any;
+        }
+        
+        if (hallOfFameChannel && 'send' in hallOfFameChannel) {
+          // DISCIPLES LEADERBOARD
+          const discipleEmbed = new EmbedBuilder()
+            .setTitle("🏆 DISCIPLES HALL OF FAME - Top 10")
+            .setColor(0xffd700)
+            .addFields(
+              {
+                name: "💎 Void Crystals",
+                value: discipleVCTop10.map((u, i) => `${i + 1}. ${u.username}: ${u.voidCrystals}`).join("\n") || "No records",
+                inline: true,
+              },
+              {
+                name: "📖 Sect Points",
+                value: discipleSPTop10.map((u, i) => `${i + 1}. ${u.username}: ${u.sectPoints}`).join("\n") || "No records",
+                inline: true,
+              },
+              {
+                name: "✅ Karma",
+                value: discipleKarmaTop10.map((u, i) => `${i + 1}. ${u.username}: ${u.karma}`).join("\n") || "No records",
+                inline: true,
+              }
+            )
+            .setTimestamp();
           
-          if (hallOfFameChannel && 'send' in hallOfFameChannel) {
-            const embed = new EmbedBuilder()
-              .setTitle("🏆 SECT HALL OF FAME - Daily Leaderboards")
-              .setColor(0xffd700)
+          await hallOfFameChannel.send({ embeds: [discipleEmbed] }).catch(console.error);
+          
+          // ELDERS LEADERBOARD
+          if (elders.length > 0) {
+            const elderEmbed = new EmbedBuilder()
+              .setTitle("👑 ELDERS HALL OF FAME - Top 10")
+              .setColor(0xaa00ff)
               .addFields(
                 {
                   name: "💎 Void Crystals",
-                  value: vcLeaderboard.map((u, i) => `${i + 1}. ${u.username}: ${u.voidCrystals}`).join("\n") || "No records",
+                  value: elderVCTop10.map((u, i) => `${i + 1}. ${u.username}: ${u.voidCrystals}`).join("\n") || "No records",
                   inline: true,
                 },
                 {
                   name: "📖 Sect Points",
-                  value: spLeaderboard.map((u, i) => `${i + 1}. ${u.username}: ${u.sectPoints}`).join("\n") || "No records",
+                  value: elderSPTop10.map((u, i) => `${i + 1}. ${u.username}: ${u.sectPoints}`).join("\n") || "No records",
                   inline: true,
                 },
                 {
                   name: "✅ Karma",
-                  value: karmaLeaderboard.map((u, i) => `${i + 1}. ${u.username}: ${u.karma}`).join("\n") || "No records",
+                  value: elderKarmaTop10.map((u, i) => `${i + 1}. ${u.username}: ${u.karma}`).join("\n") || "No records",
                   inline: true,
                 }
               )
               .setTimestamp();
             
-            await hallOfFameChannel.send({ embeds: [embed] }).catch(console.error);
+            await hallOfFameChannel.send({ embeds: [elderEmbed] }).catch(console.error);
           }
         }
       }
@@ -1090,13 +1133,13 @@ export class CultivationBot {
 
   private async handleNewMember(member: any) {
     try {
-      const user = await storage.getUserByDiscordId(
+      let user = await storage.getUserByDiscordId(
         member.user.id,
         member.guild.id
       );
       if (!user) {
         const isSupremeSectMaster = member.user.id === "1344237246240391272";
-        await storage.createUser({
+        user = await storage.createUser({
           discordId: member.user.id,
           username: member.user.username,
           avatar: member.user.displayAvatarURL(),
@@ -1108,31 +1151,38 @@ export class CultivationBot {
             level: 9,
             xp: 999999,
             voidCrystals: 999999999,
-            spiritPoints: 999999,
+            sectPoints: 999999,
             karma: 999999,
             fate: 999999,
           }),
         } as any);
       }
 
-      // Send welcome message
+      // Send welcome message to WELCOME HALL with member stats
       const channels = member.guild.channels.cache;
-      const textChannel = channels.find((c: any) => c.isTextBased() && !c.isDMBased()) as any;
+      let welcomeChannel = channels.find((c: any) => c.name === "welcome" || c.name === "welcome-hall") as any;
+      if (!welcomeChannel) {
+        welcomeChannel = channels.find((c: any) => c.isTextBased() && !c.isDMBased()) as any;
+      }
       
-      if (textChannel && 'send' in textChannel) {
+      if (welcomeChannel && 'send' in welcomeChannel && user) {
         const welcomeEmbed = new EmbedBuilder()
           .setTitle("🙏 Welcome to the Void Sect!")
           .setDescription(`Welcome, new disciple **${member.user.username}**! 🌟\n\nYou have entered the legendary Void Sect. Begin your cultivation journey and ascend through 25 realms of power!`)
           .setColor(0x9966ff)
           .addFields(
-            { name: "Getting Started", value: "Use `/profile` to see your status\nUse `/cultivate` to gain XP\nUse `/breakthrough` when ready to advance realms", inline: false },
-            { name: "Daily Rewards", value: "Receive void crystals daily for login\nParticipate in events for rare treasures\nBuild your power steadily", inline: false },
-            { name: "Commands Available", value: "Type `/` to see all available commands", inline: false }
+            { name: "🏔️ Starting Realm", value: user.realm || "Connate Realm", inline: true },
+            { name: "📊 Starting Level", value: user.level.toString(), inline: true },
+            { name: "⭐ Rank", value: user.rank || "Outer Disciple", inline: true },
+            { name: "💎 Starting Resources", value: `${user.voidCrystals} Void Crystals\n${user.sectPoints} Sect Points\n${user.karma} Karma`, inline: true },
+            { name: "Getting Started", value: "Use `/profile` to see your status\nUse `/cultivate` to gain XP\nUse `/breakthrough` at level 9 to advance realms", inline: false },
+            { name: "Daily Rewards", value: "Receive void crystals daily based on rank\nParticipate in events for rare treasures\nBuild your power steadily", inline: false },
+            { name: "How to Advance", value: "Gain XP through chatting and missions\nReach level 9 to breakthrough\nClimb through 25 realms to become Immortal", inline: false }
           )
           .setThumbnail(member.user.displayAvatarURL())
           .setTimestamp();
 
-        await textChannel.send({ content: `Welcome, <@${member.user.id}>!`, embeds: [welcomeEmbed] }).catch(console.error);
+        await welcomeChannel.send({ content: `Welcome, <@${member.user.id}>!`, embeds: [welcomeEmbed] }).catch(console.error);
       }
     } catch (error) {
       console.error("Error creating user profile:", error);
@@ -1358,6 +1408,10 @@ export class CultivationBot {
     try {
       await interaction.deferReply();
       const user = await this.getOrCreateUser(interaction);
+      if (!user) {
+        await interaction.editReply("Could not load profile.");
+        return;
+      }
 
       const embed = new EmbedBuilder()
         .setTitle(`⚔️ ${user.username}'s Cultivation Profile`)
