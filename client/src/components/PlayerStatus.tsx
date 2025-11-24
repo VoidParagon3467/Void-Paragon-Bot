@@ -79,9 +79,9 @@ export default function PlayerStatus({ user }: PlayerStatusProps) {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary font-mono">
-                    {user.spiritPoints?.toLocaleString() || 0}
+                    {user.sectPoints?.toLocaleString() || 0}
                   </div>
-                  <div className="text-xs text-muted-foreground">Spirit Points</div>
+                  <div className="text-xs text-muted-foreground">Sect Points</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-yellow-400 font-mono">

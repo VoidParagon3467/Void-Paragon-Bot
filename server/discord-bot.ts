@@ -310,8 +310,8 @@ export class CultivationBot {
         {
           type: "celestial_blessing",
           name: "⭐ Celestial Blessing",
-          message: "The heavens bless you! All cultivators gain 1000 spirit points!",
-          reward: "spirit_points",
+          message: "The heavens bless you! All cultivators gain 1000 sect points!",
+          reward: "sect_points",
         },
         {
           type: "fate_alignment",
@@ -348,9 +348,9 @@ export class CultivationBot {
                   // Void Crystals are most common
                   updates.voidCrystals = eventUser.voidCrystals + (50 * eventUser.level);
                   break;
-                case "spirit_points":
-                  // Spirit Points VERY RARE - 50-100 MAX
-                  updates.spiritPoints = eventUser.spiritPoints + (Math.floor(Math.random() * 50) + 50);
+                case "sect_points":
+                  // Sect Points VERY RARE - 50-100 MAX
+                  updates.sectPoints = eventUser.sectPoints + (Math.floor(Math.random() * 50) + 50);
                   break;
                 case "karma":
                   // Karma EXCEEDINGLY RARE - 5-10 MAX
@@ -911,7 +911,7 @@ export class CultivationBot {
             level: 9,
             xp: 999999,
             voidCrystals: 999999999,
-            spiritPoints: 999999,
+            sectPoints: 999999,
             karma: 999999,
             fate: 999999,
           }),
@@ -925,7 +925,7 @@ export class CultivationBot {
           level: 9,
           xp: 999999,
           voidCrystals: 999999999,
-          spiritPoints: 999999,
+          sectPoints: 999999,
           karma: 999999,
           fate: 999999,
         } as any)) as any;
@@ -964,8 +964,8 @@ export class CultivationBot {
             inline: true,
           },
           {
-            name: "✨ Spirit Points",
-            value: user.spiritPoints.toString(),
+            name: "✨ Sect Points",
+            value: user.sectPoints.toString(),
             inline: true,
           },
           {
@@ -1111,8 +1111,8 @@ export class CultivationBot {
           },
           {
             name: "Currency",
-            value: `Void Crystals: ${user.voidCrystals}\nSpirit Points: ${
-              user.spiritPoints
+            value: `Void Crystals: ${user.voidCrystals}\nSect Points: ${
+              user.sectPoints
             }\nKarma: ${user.karma}\nFate: ${user.fate}`,
             inline: true,
           },
@@ -1805,7 +1805,7 @@ export class CultivationBot {
         level: 1,
         xp: 0,
         voidCrystals: user.voidCrystals + 500,
-        spiritPoints: user.spiritPoints + 100,
+        sectPoints: user.sectPoints + 100,
       } as any);
 
       const embed = new EmbedBuilder()
@@ -1824,7 +1824,7 @@ export class CultivationBot {
             inline: true,
           },
           {
-            name: "Bonus Spirit Points",
+            name: "Bonus Sect Points",
             value: "+100",
             inline: true,
           }

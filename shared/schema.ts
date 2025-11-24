@@ -8,8 +8,9 @@ export const rarityEnum = pgEnum("rarity", ["common", "uncommon", "rare", "epic"
 export const itemTypeEnum = pgEnum("item_type", ["weapon", "armor", "consumable", "treasure", "skill"]);
 export const missionTypeEnum = pgEnum("mission_type", ["daily", "weekly", "monthly", "special"]);
 export const missionStatusEnum = pgEnum("mission_status", ["active", "completed", "failed", "expired"]);
-export const battleTypeEnum = pgEnum("battle_type", ["spar", "faction_war", "mission", "duel"]);
+export const battleTypeEnum = pgEnum("battle_type", ["spar", "faction_war", "clan_war", "mission", "duel"]);
 export const battleResultEnum = pgEnum("battle_result", ["win", "lose", "draw"]);
+export const tokenTypeEnum = pgEnum("token_type", ["faction", "clan", "faction_change", "clan_change"]);
 
 // Cultivation realms (25 total) - exactly as specified by user
 export const cultivationRealms = [
@@ -21,6 +22,18 @@ export const cultivationRealms = [
 ] as const;
 
 export const realmEnum = pgEnum("realm", cultivationRealms);
+
+// Rank hierarchy with daily VC multipliers
+export const rankHierarchy = {
+  "Supreme Sect Master": { multiplier: 100, level: 15 },
+  "Heavenly Elder": { multiplier: 8, level: 14 },
+  "Great Elder": { multiplier: 6, level: 13 },
+  "Elder": { multiplier: 4, level: 12 },
+  "Core Disciple": { multiplier: 3, level: 11 },
+  "Inner Disciple": { multiplier: 2, level: 10 },
+  "Inheritor Disciple": { multiplier: 1.5, level: 9 },
+  "Outer Disciple": { multiplier: 1, level: 1 },
+} as const;
 
 // Users/Players table
 export const users = pgTable("users", {
@@ -35,9 +48,9 @@ export const users = pgTable("users", {
   rank: text("rank").notNull().default("Outer Disciple"), // Named ranks as specified
   // Currency
   voidCrystals: integer("void_crystals").notNull().default(0),
-  spiritPoints: integer("spirit_points").notNull().default(0), // SP
+  sectPoints: integer("sect_points").notNull().default(0), // SP (Sect Points)
   karma: integer("karma").notNull().default(0),
-  fate: integer("fate").notNull().default(0),
+  fate: integer("fate").notNull().default(0), // Luck stat - affects battles, spars, airdrops, dangerous situations
   // Bloodline
   bloodlineId: integer("bloodline_id"),
   // Faction
@@ -56,6 +69,7 @@ export const users = pgTable("users", {
   // Meta
   createdAt: timestamp("created_at").defaultNow(),
   lastActive: timestamp("last_active").defaultNow(),
+  lastDailyRewardAt: timestamp("last_daily_reward_at"),
   // Discord server specific
   serverId: text("server_id").notNull(),
 });
@@ -79,9 +93,11 @@ export const factions = pgTable("factions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  rules: text("rules"), // Faction rules
   leaderId: integer("leader_id"),
   warPoints: integer("war_points").notNull().default(0),
   memberCount: integer("member_count").notNull().default(0),
+  hierarchy: jsonb("hierarchy"), // Warden positions and hierarchy
   icon: text("icon"),
   serverId: text("server_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -92,14 +108,28 @@ export const clans = pgTable("clans", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  founderId: integer("founder_id"),
+  rules: text("rules"), // Clan rules
+  chiefId: integer("chief_id"), // Clan chief (equivalent to leader)
   level: integer("level").notNull().default(1), // Clan levels 1-10
   prestige: integer("prestige").notNull().default(0),
   memberCount: integer("member_count").notNull().default(0),
   treasury: integer("treasury").notNull().default(0), // Shared resources
+  warPoints: integer("war_points").notNull().default(0),
+  elderIds: jsonb("elder_ids"), // List of elder user IDs
+  hierarchy: jsonb("hierarchy"), // Clan hierarchy info
   icon: text("icon"),
   serverId: text("server_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Tokens table (for faction creation, clan creation, and changing)
+export const tokens = pgTable("tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: tokenTypeEnum("type").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  acquiredAt: timestamp("acquired_at").defaultNow(),
+  usedAt: timestamp("used_at"),
 });
 
 // Items table
@@ -214,6 +244,7 @@ export const userRelations = relations(users, ({ one, many }) => ({
   battlesAsAttacker: many(battles, { relationName: "attacker" }),
   battlesAsDefender: many(battles, { relationName: "defender" }),
   activities: many(activities),
+  tokens: many(tokens),
 }));
 
 export const bloodlineRelations = relations(bloodlines, ({ many }) => ({
@@ -229,11 +260,18 @@ export const factionRelations = relations(factions, ({ one, many }) => ({
 }));
 
 export const clanRelations = relations(clans, ({ one, many }) => ({
-  founder: one(users, {
-    fields: [clans.founderId],
+  chief: one(users, {
+    fields: [clans.chiefId],
     references: [users.id],
   }),
   members: many(users),
+}));
+
+export const tokenRelations = relations(tokens, ({ one }) => ({
+  user: one(users, {
+    fields: [tokens.userId],
+    references: [users.id],
+  }),
 }));
 
 export const itemRelations = relations(items, ({ many }) => ({
@@ -291,6 +329,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   lastActive: true,
+  lastDailyRewardAt: true,
 });
 
 export const insertBloodlineSchema = createInsertSchema(bloodlines).omit({
@@ -309,6 +348,13 @@ export const insertClanSchema = createInsertSchema(clans).omit({
   memberCount: true,
   prestige: true,
   treasury: true,
+  warPoints: true,
+});
+
+export const insertTokenSchema = createInsertSchema(tokens).omit({
+  id: true,
+  acquiredAt: true,
+  usedAt: true,
 });
 
 export const insertItemSchema = createInsertSchema(items).omit({
@@ -342,6 +388,10 @@ export type Bloodline = typeof bloodlines.$inferSelect;
 export type InsertBloodline = z.infer<typeof insertBloodlineSchema>;
 export type Faction = typeof factions.$inferSelect;
 export type InsertFaction = z.infer<typeof insertFactionSchema>;
+export type Clan = typeof clans.$inferSelect;
+export type InsertClan = z.infer<typeof insertClanSchema>;
+export type Token = typeof tokens.$inferSelect;
+export type InsertToken = z.infer<typeof insertTokenSchema>;
 export type Item = typeof items.$inferSelect;
 export type InsertItem = z.infer<typeof insertItemSchema>;
 export type UserItem = typeof userItems.$inferSelect;
