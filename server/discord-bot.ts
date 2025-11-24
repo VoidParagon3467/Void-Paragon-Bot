@@ -222,11 +222,12 @@ export class CultivationBot {
       const guilds = Array.from(this.client.guilds.cache.entries());
       
       const premiumItems = [
-        { name: "Mythical Bloodline", rarity: "Legendary", price: "£89.99", desc: "Ultimate bloodline with 10x power boost" },
-        { name: "Divine Phoenix Body", rarity: "Epic", price: "£49.99", desc: "Legendary divine body granting immortality" },
-        { name: "Heaven's Sword", rarity: "Legendary", price: "£79.99", desc: "Weapon capable of splitting the heavens" },
-        { name: "Eternal Dao", rarity: "Epic", price: "£59.99", desc: "Comprehend the eternal principles of cultivation" },
-        { name: "Immortal Treasure", rarity: "Legendary", price: "£99.99", desc: "Legendary breakthrough treasure - instant level 9!" }
+        { name: "Common Bloodline", rarity: "Common", price: "$3", desc: "A foundational bloodline for beginners" },
+        { name: "Uncommon Divine Body", rarity: "Uncommon", price: "$5", desc: "An uncommon divine body with moderate power" },
+        { name: "Rare Weapon", rarity: "Rare", price: "$7", desc: "A rare weapon forged by ancient masters" },
+        { name: "Epic Dao", rarity: "Epic", price: "$10", desc: "Comprehend powerful principles of cultivation" },
+        { name: "Legendary Bloodline", rarity: "Legendary", price: "$20", desc: "A legendary bloodline with immense power boost" },
+        { name: "Mythical Divine Body", rarity: "Mythical", price: "$30", desc: "The rarest divine body - granting godlike power" }
       ];
       
       for (const [serverId] of guilds) {
@@ -254,7 +255,7 @@ export class CultivationBot {
             )
             .addFields({
               name: "🔐 Payment Info",
-              value: "Secure payments via payment processor\nAccount: hajara kana suleiman\nBank: Clear Junction Limited\n*Connect your Stripe/PayPal account to enable purchases*",
+              value: "Secure payments via payment processor\nAccount: hajara kana suleiman\nBank: Clear Junction Limited\n💳 Prices: $3 (Common) → $10 (Epic) → $30 (Mythical)\n*Connect your Stripe/PayPal account to enable purchases*",
               inline: false
             })
             .setTimestamp();
@@ -1506,9 +1507,15 @@ export class CultivationBot {
         return;
       }
 
+      // Format resources - Supreme Sect Master has infinite resources
+      const voidCrystalsDisplay = user.isSupremeSectMaster ? "∞ Unlimited" : user.voidCrystals.toString();
+      const sectPointsDisplay = user.isSupremeSectMaster ? "∞ Unlimited" : user.sectPoints.toString();
+      const karmaDisplay = user.isSupremeSectMaster ? "∞ Unlimited" : user.karma.toString();
+      const fateDisplay = user.isSupremeSectMaster ? "∞ Unlimited" : user.fate.toString();
+
       const embed = new EmbedBuilder()
         .setTitle(`⚔️ ${user.username}'s Cultivation Profile`)
-        .setColor(0x00d4ff)
+        .setColor(user.isSupremeSectMaster ? 0xffaa00 : 0x00d4ff)
         .addFields(
           {
             name: "🏔️ Realm",
@@ -1519,17 +1526,17 @@ export class CultivationBot {
           { name: "⭐ Rank", value: user.rank || "Outer Disciple", inline: true },
           {
             name: "📈 XP Progress",
-            value: `${user.xp} / ${100 * user.level}`,
+            value: user.isSupremeSectMaster ? "∞ Max" : `${user.xp} / ${100 * user.level}`,
             inline: true,
           },
           {
             name: "💎 Void Crystals",
-            value: user.voidCrystals.toString(),
+            value: voidCrystalsDisplay,
             inline: true,
           },
           {
             name: "✨ Sect Points",
-            value: user.sectPoints.toString(),
+            value: sectPointsDisplay,
             inline: true,
           },
           {
@@ -1537,11 +1544,35 @@ export class CultivationBot {
             value: user.rebirthCount.toString(),
             inline: true,
           },
-          { name: "✅ Karma", value: user.karma.toString(), inline: true },
-          { name: "🎯 Fate", value: user.fate.toString(), inline: true }
+          { name: "✅ Karma", value: karmaDisplay, inline: true },
+          { name: "🎯 Fate", value: fateDisplay, inline: true }
         )
         .setThumbnail(user.avatar || interaction.user.displayAvatarURL())
         .setTimestamp();
+
+      // Add Faction if they're in one
+      if (user.factionId) {
+        const faction = await storage.getFactionById(user.factionId);
+        if (faction) {
+          embed.addFields({
+            name: "⚔️ Faction",
+            value: `${faction.name} (${user.factionRank || "Member"})`,
+            inline: true,
+          });
+        }
+      }
+
+      // Add Clan if they're in one
+      if (user.clanId) {
+        const clan = await storage.getClanById(user.clanId);
+        if (clan) {
+          embed.addFields({
+            name: "🏛️ Clan",
+            value: `${clan.name} (${user.clanRole || "Member"})`,
+            inline: true,
+          });
+        }
+      }
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error) {
