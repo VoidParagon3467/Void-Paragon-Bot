@@ -3,30 +3,40 @@ import InventoryShop from "@/components/InventoryShop";
 import Navigation from "@/components/Navigation";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { queryClient } from "@/lib/queryClient";
-
-// Mock user data for demo - in production this would come from Discord auth
-const MOCK_USER = {
-  discordId: "123456789",
-  serverId: "987654321"
-};
+import { useState, useEffect } from "react";
 
 export default function Inventory() {
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("auth_session");
+    if (stored) setSessionToken(stored);
+  }, []);
+
   // Fetch user data
   const { data: user, isLoading: userLoading } = useQuery({
-    queryKey: [`/api/user/${MOCK_USER.discordId}/${MOCK_USER.serverId}`],
+    queryKey: [`/api/auth/me`, sessionToken],
+    queryFn: async () => {
+      if (!sessionToken) return null;
+      const res = await fetch(`/api/auth/me?session=${sessionToken}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
     retry: false,
+    enabled: !!sessionToken,
   });
 
   // Fetch server settings to check if user is Sect Master
   const { data: serverSettings } = useQuery({
-    queryKey: [`/api/server-settings/${MOCK_USER.serverId}`],
+    queryKey: [`/api/server-settings/${user?.serverId}`],
     retry: false,
+    enabled: !!user?.serverId,
   });
 
-  const isSectMaster = serverSettings?.sectMasterId === MOCK_USER.discordId;
+  const isSectMaster = user?.isSupremeSectMaster || serverSettings?.sectMasterId === user?.discordId;
 
   // WebSocket for real-time updates
-  useWebSocket(MOCK_USER.serverId, (message) => {
+  useWebSocket(user?.serverId || '', (message) => {
     switch (message.type) {
       case 'userUpdated':
       case 'itemPurchased':

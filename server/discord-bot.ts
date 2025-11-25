@@ -1927,9 +1927,9 @@ export class CultivationBot {
     return "Outer Disciple";                            // Realms 1-3
   }
 
-  private async checkAndPromoteRank(userId: string, serverId: string) {
+  private async checkAndPromoteRank(userId: number, serverId: string) {
     try {
-      const user = await storage.getUserById(userId);
+      const user = await storage.getUserWithDetails(userId);
       if (!user) return;
 
       const realmIndex = cultivationRealms.indexOf(user.realm as any);
@@ -1972,9 +1972,9 @@ export class CultivationBot {
     }
   }
 
-  private async grantXp(userId: string, amount: number) {
+  private async grantXp(userId: number, amount: number) {
     try {
-      const user = await storage.getUserById(userId);
+      const user = await storage.getUserWithDetails(userId);
       if (!user) return;
 
       // EXCLUDE Supreme Sect Master from XP earning - he is too great!
