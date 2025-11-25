@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import ProfilePage from "@/pages/profile";
@@ -37,30 +37,31 @@ function Router() {
 }
 
 function SessionHandler({ children }: { children: React.ReactNode }) {
-  const checked = useRef(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (checked.current) return;
-    checked.current = true;
-
-    // Check for OAuth callback with session parameter
+    // Check for OAuth callback with session parameter FIRST
     const params = new URLSearchParams(window.location.search);
     const sessionFromUrl = params.get("session");
-    const existingToken = sessionStorage.getItem("auth_session");
     
     console.log("[SessionHandler] URL search string:", window.location.search);
-    console.log("[SessionHandler] Session from URL:", sessionFromUrl?.substring(0, 10));
-    console.log("[SessionHandler] Existing token:", existingToken?.substring(0, 10));
+    console.log("[SessionHandler] Session from URL:", sessionFromUrl);
     
     if (sessionFromUrl) {
-      console.log("[SessionHandler] ✅ FOUND TOKEN IN URL - STORING and reloading");
+      console.log("[SessionHandler] ✅ FOUND TOKEN IN URL - STORING");
       sessionStorage.setItem("auth_session", sessionFromUrl);
-      // Force reload to ensure ProfilePage sees the token
-      window.location.href = "/";
-    } else {
-      console.log("[SessionHandler] No session in URL");
+      // Clean URL and mark ready
+      window.history.replaceState({}, document.title, "/");
     }
+    
+    // Mark ready AFTER token is stored
+    setReady(true);
   }, []);
+
+  // Don't render Router until we've processed the token
+  if (!ready) {
+    return null;
+  }
 
   return <>{children}</>;
 }
