@@ -785,16 +785,55 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Simulate different item effects based on type
-      const effects: Record<string, string> = {
-        weapon: `⚔️ Equipped weapon! Power increased!`,
-        pill: `💊 Consumed pill! Gained 1 level!`,
-        treasure: `✨ Treasure activated! +500 XP earned!`,
-        bloodline: `🔥 Bloodline activated! Stats boosted!`,
-        skill: `📚 Skill learned! New ability unlocked!`,
-      };
+      const user = await storage.getUserWithDetails(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
-      const message = effects[itemType] || "Item used successfully";
+      const items = await storage.getItems();
+      const item = items.find((i: any) => i.id === itemId);
+      if (!item) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+
+      let updatedUser = user;
+      let message = "Item used successfully";
+
+      // Handle different item types
+      if (itemType === "weapon") {
+        // Equip weapon
+        updatedUser = await storage.updateUser(userId, { 
+          equippedWeaponId: itemId 
+        });
+        message = `⚔️ ${item.name} equipped! Power increased!`;
+      } else if (itemType === "pill" || itemType === "consumable") {
+        // Consume and boost stats
+        updatedUser = await storage.updateUser(userId, {
+          xp: ((user as any).xp || 0) + 100,
+          voidCrystals: ((user as any).voidCrystals || 0) + 50,
+        });
+        // Remove from inventory by not returning it in queries
+        message = `💊 ${item.name} consumed! +100 XP, +50 Void Crystals!`;
+      } else if (itemType === "treasure") {
+        // Activate treasure for rewards
+        updatedUser = await storage.updateUser(userId, {
+          xp: ((user as any).xp || 0) + 500,
+          sectPoints: ((user as any).sectPoints || 0) + 200,
+        });
+        message = `✨ ${item.name} treasure unlocked! +500 XP, +200 Sect Points!`;
+      } else if (itemType === "bloodline") {
+        // Activate bloodline
+        updatedUser = await storage.updateUser(userId, {
+          bloodlineId: itemId,
+        });
+        message = `🔥 ${item.name} bloodline activated! Stats boosted!`;
+      } else if (itemType === "skill") {
+        // Learn skill
+        updatedUser = await storage.updateUser(userId, {
+          xp: ((user as any).xp || 0) + 200,
+        });
+        message = `📚 ${item.name} skill learned! +200 XP earned!`;
+      }
 
       // Broadcast via WebSocket to all clients
       broadcast("", {
@@ -802,15 +841,26 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
         userId,
         itemId,
         itemType,
-        message
+        message,
+        newStats: {
+          xp: (updatedUser as any).xp,
+          voidCrystals: (updatedUser as any).voidCrystals,
+          sectPoints: (updatedUser as any).sectPoints,
+        }
       });
 
       res.json({ 
         success: true,
         message,
-        effect: itemType
+        effect: itemType,
+        newStats: {
+          xp: (updatedUser as any).xp,
+          voidCrystals: (updatedUser as any).voidCrystals,
+          sectPoints: (updatedUser as any).sectPoints,
+        }
       });
     } catch (error) {
+      console.error("Use item error:", error);
       res.status(500).json({ error: "Failed to use item" });
     }
   });
