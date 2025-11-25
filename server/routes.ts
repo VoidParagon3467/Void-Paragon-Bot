@@ -69,8 +69,10 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
 
   app.get("/api/auth/callback", async (req: Request, res: Response) => {
     try {
+      console.log("🔐 [OAuth] Starting callback...");
       const code = req.query.code as string;
       if (!code) {
+        console.error("❌ [OAuth] No code provided");
         return res.redirect("/?error=no_code");
       }
 
@@ -84,6 +86,7 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       }
 
       // Exchange code for token
+      console.log("🔐 [OAuth] Exchanging code for token...");
       const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -98,31 +101,40 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
 
       const tokenData = await tokenResponse.json() as any;
       if (!tokenData.access_token) {
+        console.error("❌ [OAuth] No access token returned:", tokenData);
         return res.redirect("/?error=no_token");
       }
+      console.log("✅ [OAuth] Got access token");
 
       // Get user info
+      console.log("🔐 [OAuth] Fetching user info...");
       const userResponse = await fetch("https://discord.com/api/users/@me", {
         headers: { "Authorization": `Bearer ${tokenData.access_token}` },
       });
       const userData = await userResponse.json() as any;
+      console.log("✅ [OAuth] Got user:", userData.username);
 
       // Get user guilds
+      console.log("🔐 [OAuth] Fetching user guilds...");
       const guildsResponse = await fetch("https://discord.com/api/users/@me/guilds", {
         headers: { "Authorization": `Bearer ${tokenData.access_token}` },
       });
       const guilds = await guildsResponse.json() as any[];
       const firstGuild = guilds?.[0]?.id;
+      console.log("✅ [OAuth] Got guilds:", firstGuild);
 
       if (!firstGuild) {
+        console.error("❌ [OAuth] No guild found");
         return res.redirect("/?error=no_guild");
       }
 
       // Create or get user
+      console.log("🔐 [DB] Checking if user exists...");
       let user = await storage.getUserByDiscordId(userData.id, firstGuild);
       const isSupremeSectMaster = userData.id === "1344237246240391272";
       
       if (!user) {
+        console.log("🔐 [DB] Creating new user...");
         user = await storage.createUser({
           discordId: userData.id,
           username: userData.username,
@@ -141,50 +153,68 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
           isMeditating: false,
           isSupremeSectMaster,
         });
-        console.log(`✅ New user created: ${userData.username} (${userData.id}) in server ${firstGuild}${isSupremeSectMaster ? " 👑 AS SUPREME SECT MASTER!" : ""}`);
+        console.log(`✅ [DB] New user created: ${userData.username} (ID: ${user.id})${isSupremeSectMaster ? " 👑 AS SUPREME SECT MASTER!" : ""}`);
       } else if (isSupremeSectMaster && !user.isSupremeSectMaster) {
-        // Upgrade existing user to Supreme Sect Master if they log in with your ID
+        console.log("🔐 [DB] Upgrading to Supreme Sect Master...");
         user = await storage.updateUser(user.id, {
           isSupremeSectMaster: true,
           rank: "Supreme Sect Master",
           realm: "True God Realm",
           level: 25,
         });
-        console.log(`👑 User upgraded to Supreme Sect Master: ${userData.username}`);
+        console.log(`👑 [DB] User upgraded to Supreme Sect Master`);
+      } else {
+        console.log(`✅ [DB] User exists: ${user.username}`);
       }
 
       // Store session in database (24 hour expiry)
+      console.log("🔐 [Session] Creating session...");
       const sessionToken = generateSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS);
       await storage.createSession(sessionToken, userData.id, firstGuild, expiresAt);
+      console.log(`✅ [Session] Created: ${sessionToken.substring(0, 10)}... for user ${userData.id}`);
 
       // Redirect with token
-      res.redirect(`/?session=${sessionToken}`);
+      const redirectUrl = `/?session=${sessionToken}`;
+      console.log(`🔐 [Redirect] Sending: ${redirectUrl}`);
+      res.redirect(redirectUrl);
     } catch (error) {
-      console.error("OAuth callback error:", error);
+      console.error("❌ [OAuth] Callback error:", error);
       res.redirect("/?error=callback_failed");
     }
   });
 
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     const sessionToken = req.query.session as string;
+    console.log(`🔐 [Auth] /auth/me called with session: ${sessionToken?.substring(0, 10)}...`);
+    
     if (!sessionToken) {
+      console.error("❌ [Auth] No session token provided");
       return res.status(401).json({ error: "Not authenticated" });
     }
 
     try {
+      console.log(`🔐 [Auth] Looking up session...`);
       const session = await storage.getSession(sessionToken);
       if (!session) {
+        console.error(`❌ [Auth] Session not found or expired: ${sessionToken.substring(0, 10)}...`);
         return res.status(401).json({ error: "Invalid or expired session" });
       }
+      console.log(`✅ [Auth] Session found for discordId: ${session.discordId}`);
 
+      console.log(`🔐 [Auth] Looking up user...`);
       const user = await storage.getUserByDiscordId(session.discordId, session.serverId);
       if (!user) {
+        console.error(`❌ [Auth] User not found for discordId: ${session.discordId} in server: ${session.serverId}`);
         return res.status(404).json({ error: "User not found" });
       }
+      console.log(`✅ [Auth] User found: ${user.username}`);
+      
       const userWithDetails = await storage.getUserWithDetails(user.id);
+      console.log(`✅ [Auth] Returning user data`);
       res.json({ ...userWithDetails, sessionToken });
     } catch (error) {
+      console.error("❌ [Auth] Error fetching user:", error);
       res.status(500).json({ error: "Failed to fetch user" });
     }
   });
