@@ -746,7 +746,7 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
   // Buy item endpoint
   app.post("/api/shop/buy", async (req: Request, res: Response) => {
     try {
-      const { userId, itemId, currency } = req.body;
+      const { userId, itemId, currency, serverId } = req.body;
       if (!userId || !itemId || !currency) {
         return res.status(400).json({ error: "Missing required fields" });
       }
@@ -777,14 +777,18 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       // Add item to inventory
       await storage.addItemToUser(userId, itemId, 1);
 
-      // Broadcast
-      broadcast(req.body.serverId || "", {
-        type: "itemPurchased",
+      // Emit EventBus event for real-time sync
+      const finalServerId = serverId || (user as any).serverId || "default";
+      eventBus.emitDashboardAction({
+        type: "item_purchased",
+        serverId: finalServerId,
         userId,
         itemId,
         itemName: item.name,
         currency,
-        newBalance: (updatedUser as any)[currencyField]
+        cost: item.price,
+        newBalance: (updatedUser as any)[currencyField],
+        timestamp: new Date(),
       });
 
       res.json({ success: true, message: `Purchased ${item.name}!` });
@@ -1101,18 +1105,34 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
 
   app.post("/api/missions/complete", async (req: Request, res: Response) => {
     try {
-      const { userId, missionId } = req.body;
+      const { userId, missionId, serverId } = req.body;
       if (!userId || !missionId) return res.status(400).json({ error: "Missing fields" });
       
       const userMission = await storage.completeMission(userId, missionId);
       const user = await storage.getUserWithDetails(userId);
       
       if (user && userMission) {
+        const newXp = ((user as any).xp || 0) + 200;
+        const newCrystals = ((user as any).voidCrystals || 0) + 500;
+        
         await storage.updateUser(userId, {
-          xp: ((user as any).xp || 0) + 200,
-          voidCrystals: ((user as any).voidCrystals || 0) + 500,
+          xp: newXp,
+          voidCrystals: newCrystals,
         });
-        broadcast("", { type: "missionCompleted", userId, missionId });
+        
+        const finalServerId = serverId || (user as any).serverId || "default";
+        eventBus.emitDashboardAction({
+          type: "mission_completed",
+          serverId: finalServerId,
+          userId,
+          missionId,
+          missionTitle: (userMission as any).title,
+          xpReward: 200,
+          crystalReward: 500,
+          newXp,
+          newCrystals,
+          timestamp: new Date(),
+        });
       }
       
       res.json({ success: true, message: "Mission completed!" });
@@ -1133,14 +1153,15 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
 
   app.post("/api/factions/create", async (req: Request, res: Response) => {
     try {
-      const { name, leaderId } = req.body;
+      const { name, leaderId, serverId } = req.body;
       if (!name || !leaderId) return res.status(400).json({ error: "Missing fields" });
       
+      const finalServerId = serverId || "default";
       const faction = await storage.createFaction({
         name,
         description: "A new faction",
         leaderId,
-        serverId: "default",
+        serverId: finalServerId,
         xp: 0,
         voidCrystals: 0,
         warPoints: 0,
@@ -1148,7 +1169,17 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       } as any);
       
       await storage.joinFaction(leaderId, faction.id, "Leader");
-      broadcast("", { type: "factionCreated", faction });
+      
+      // Emit EventBus event for real-time sync
+      eventBus.emitDashboardAction({
+        type: "faction_created",
+        serverId: finalServerId,
+        factionId: (faction as any).id,
+        factionName: name,
+        leaderId,
+        timestamp: new Date(),
+      });
+      
       res.json({ success: true, message: "Faction created!", faction });
     } catch (error) {
       res.json({ success: true, message: "Faction created!" });
@@ -1182,7 +1213,16 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       } as any);
       
       await storage.joinClan(chiefId, clan.id, "Chief");
-      broadcast("", { type: "clanCreated", clan });
+      
+      // Emit EventBus event for real-time sync
+      eventBus.emitDashboardAction({
+        type: "clan_created",
+        serverId: "default",
+        clanId: (clan as any).id,
+        clanName: name,
+        chiefId,
+        timestamp: new Date(),
+      });
       res.json({ success: true, message: "Clan established!", clan });
     } catch (error) {
       res.json({ success: true, message: "Clan established!" });
