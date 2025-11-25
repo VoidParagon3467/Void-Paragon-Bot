@@ -179,6 +179,16 @@ export class CultivationBot {
       await this.handleSlashCommand(interaction);
     });
 
+    this.client.on("voiceStateUpdate", async (oldState, newState) => {
+      // Track voice channel XP when user joins
+      if (!oldState.channel && newState.channel) {
+        const member = newState.member;
+        if (member && !member.user.bot) {
+          await this.handleVoiceXp(member, newState.guild.id);
+        }
+      }
+    });
+
     this.client.on("error", (error) => {
       console.error("❌ Discord client error:", error);
     });
@@ -228,6 +238,12 @@ export class CultivationBot {
     
     // Meditation XP gain every 1 minute
     setInterval(() => this.distributeMeditationXp(), 60 * 1000);
+
+    // Voice channel XP gain every 2 minutes (small XP)
+    setInterval(() => this.distributeVoiceXp(), 2 * 60 * 1000);
+
+    // Event participation XP every 3 minutes (very small XP)
+    setInterval(() => this.distributeEventParticipationXp(), 3 * 60 * 1000);
 
     // Also run these immediately on startup
     this.distributeDailyResources().catch(console.error);
@@ -1686,6 +1702,98 @@ export class CultivationBot {
       }
     } catch (error) {
       console.error("Error distributing meditation XP:", error);
+    }
+  }
+
+  private async handleVoiceXp(member: any, serverId: string) {
+    try {
+      const user = await storage.getUserByDiscordId(member.id, serverId);
+      if (!user) return;
+      
+      // Small XP for joining voice (1-3 XP)
+      const xpGain = Math.floor(Math.random() * 3) + 1;
+      await this.grantXp(user.id, xpGain);
+    } catch (error) {
+      console.error("Error handling voice XP:", error);
+    }
+  }
+
+  private async distributeVoiceXp() {
+    try {
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      for (const [serverId, guild] of guilds) {
+        const voiceChannels = guild.channels.cache.filter((ch: any) => ch.isVoiceBased());
+        
+        for (const [, channel] of voiceChannels) {
+          const members = channel.members.filter((m: any) => !m.user.bot);
+          
+          for (const [, member] of members) {
+            const user = await storage.getUserByDiscordId(member.id, serverId);
+            if (user) {
+              // Very small XP gain in voice - 0.5-1 XP every 2 minutes
+              const xpGain = Math.random() > 0.5 ? 1 : 0;
+              if (xpGain > 0) {
+                await storage.updateUser(user.id, {
+                  xp: user.xp + xpGain,
+                } as any);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error distributing voice XP:", error);
+    }
+  }
+
+  private async distributeEventParticipationXp() {
+    try {
+      const guilds = Array.from(this.client.guilds.cache.entries());
+      
+      for (const [serverId] of guilds) {
+        // Get users currently in voice channels (event participation)
+        const users = await storage.getUsersInServer(serverId);
+        
+        for (const user of users) {
+          // Check if user has joinedEventAt timestamp
+          const isInEvent = (user as any).joinedEventAt && 
+            new Date().getTime() - new Date((user as any).joinedEventAt).getTime() < 30 * 60 * 1000; // Within 30 min
+          
+          if (isInEvent) {
+            // Tiny XP for event participation - 0.25-0.5 XP every 3 minutes
+            const xpGain = Math.random() > 0.5 ? 1 : 0;
+            if (xpGain > 0) {
+              await storage.updateUser(user.id, {
+                xp: user.xp + xpGain,
+              } as any);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error distributing event participation XP:", error);
+    }
+  }
+
+  private async grantXp(userId: string, amount: number) {
+    try {
+      const user = await storage.getUserById(userId);
+      if (!user) return;
+
+      const newXp = user.xp + amount;
+      const xpToNextLevel = 100 * (user.level ** 2);
+
+      if (newXp >= xpToNextLevel) {
+        await storage.updateUser(userId, {
+          level: user.level + 1,
+          xp: newXp - xpToNextLevel,
+        } as any);
+      } else {
+        await storage.updateUser(userId, { xp: newXp } as any);
+      }
+    } catch (error) {
+      console.error("Error granting XP:", error);
     }
   }
 
