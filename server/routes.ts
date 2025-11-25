@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -10,6 +10,14 @@ import { EmbedBuilder } from "discord.js";
 // Extend WebSocket type to include serverId
 interface ExtendedWebSocket extends WebSocket {
   serverId?: string;
+}
+
+// In-memory session storage for authentication
+const sessions = new Map<string, { discordId: string; serverId: string; user: any }>();
+
+// Generate simple session token
+function generateSessionToken(): string {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
 export async function registerRoutes(app: Express, botClient?: any): Promise<Server> {
@@ -49,6 +57,115 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       }
     });
   };
+
+  // Discord OAuth endpoints
+  app.get("/api/auth/login", (req: Request, res: Response) => {
+    const clientId = process.env.DISCORD_CLIENT_ID || "1234567890"; // Placeholder
+    const redirectUri = encodeURIComponent(process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/callback`);
+    const scopes = "identify%20guilds%20email";
+    const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scopes}`;
+    res.redirect(authUrl);
+  });
+
+  app.get("/api/auth/callback", async (req: Request, res: Response) => {
+    try {
+      const code = req.query.code as string;
+      if (!code) {
+        return res.redirect("/?error=no_code");
+      }
+
+      const clientId = process.env.DISCORD_CLIENT_ID;
+      const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+      const redirectUri = process.env.DISCORD_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/callback`;
+
+      if (!clientId || !clientSecret) {
+        console.warn("Discord OAuth not configured (DISCORD_CLIENT_ID or DISCORD_CLIENT_SECRET missing)");
+        return res.redirect("/?error=not_configured");
+      }
+
+      // Exchange code for token
+      const tokenResponse = await fetch("https://discord.com/api/oauth2/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+        }).toString(),
+      });
+
+      const tokenData = await tokenResponse.json() as any;
+      if (!tokenData.access_token) {
+        return res.redirect("/?error=no_token");
+      }
+
+      // Get user info
+      const userResponse = await fetch("https://discord.com/api/users/@me", {
+        headers: { "Authorization": `Bearer ${tokenData.access_token}` },
+      });
+      const userData = await userResponse.json() as any;
+
+      // Get user guilds
+      const guildsResponse = await fetch("https://discord.com/api/users/@me/guilds", {
+        headers: { "Authorization": `Bearer ${tokenData.access_token}` },
+      });
+      const guilds = await guildsResponse.json() as any[];
+      const firstGuild = guilds?.[0]?.id;
+
+      if (!firstGuild) {
+        return res.redirect("/?error=no_guild");
+      }
+
+      // Store session
+      const sessionToken = generateSessionToken();
+      const user = await storage.getUserByDiscordId(userData.id, firstGuild);
+      
+      sessions.set(sessionToken, {
+        discordId: userData.id,
+        serverId: firstGuild,
+        user: user || { id: userData.id, username: userData.username },
+      });
+
+      // Redirect with token
+      res.redirect(`/?session=${sessionToken}`);
+    } catch (error) {
+      console.error("OAuth callback error:", error);
+      res.redirect("/?error=callback_failed");
+    }
+  });
+
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
+    const sessionToken = req.query.session as string;
+    if (!sessionToken) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const session = sessions.get(sessionToken);
+    if (!session) {
+      return res.status(401).json({ error: "Invalid session" });
+    }
+
+    try {
+      const user = await storage.getUserByDiscordId(session.discordId, session.serverId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const userWithDetails = await storage.getUserWithDetails(user.id);
+      res.json({ ...userWithDetails, sessionToken });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    const sessionToken = req.body.sessionToken || (req.query.session as string);
+    if (sessionToken) {
+      sessions.delete(sessionToken);
+    }
+    res.json({ success: true });
+  });
 
   // Chapter announcement webhook for Jadescrolls integration
   app.post("/api/chapter-announcement", async (req, res) => {

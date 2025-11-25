@@ -5,9 +5,10 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { 
   Crown, Zap, Users, Shield, Flame, Gem, Award, TrendingUp, 
-  Settings, Eye, Unlock, ChevronRight, AlertCircle, Lock
+  Settings, Eye, Unlock, ChevronRight, AlertCircle, Lock, LogIn
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
 
 interface User {
   id: string;
@@ -37,11 +38,6 @@ interface ServerSettings {
   sectMasterId: string;
 }
 
-const MOCK_USER = {
-  discordId: "123456789",
-  serverId: "987654321"
-};
-
 const rankHierarchy: Record<string, { level: number; multiplier: number; permissions: string[] }> = {
   "Supreme Sect Master": { level: 15, multiplier: 100, permissions: ["all"] },
   "Heavenly Elder": { level: 14, multiplier: 8, permissions: ["events", "moderation", "shop", "treasury", "clan_creation"] },
@@ -66,17 +62,44 @@ const rankProgression = [
 ];
 
 export default function Dashboard() {
+  const [, setLocation] = useLocation();
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get session token from URL or localStorage
+    const params = new URLSearchParams(window.location.search);
+    const urlSession = params.get("session");
+    const storedSession = sessionStorage.getItem("auth_session");
+    
+    if (urlSession) {
+      setSessionToken(urlSession);
+      sessionStorage.setItem("auth_session", urlSession);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (storedSession) {
+      setSessionToken(storedSession);
+    }
+  }, []);
+
   const { data: user, isLoading: userLoading } = useQuery<User | null>({
-    queryKey: [`/api/user/${MOCK_USER.discordId}/${MOCK_USER.serverId}`],
+    queryKey: [`/api/auth/me`, sessionToken],
+    queryFn: async () => {
+      if (!sessionToken) return null;
+      const res = await fetch(`/api/auth/me?session=${sessionToken}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
     retry: false,
+    enabled: !!sessionToken,
   });
 
   const { data: serverSettings } = useQuery<ServerSettings | null>({
-    queryKey: [`/api/server-settings/${MOCK_USER.serverId}`],
+    queryKey: [`/api/server-settings/${user?.serverId}`],
     retry: false,
+    enabled: !!user?.serverId,
   });
 
-  const isSectMaster = user?.isSupremeSectMaster || serverSettings?.sectMasterId === MOCK_USER.discordId;
+  const isSectMaster = user?.isSupremeSectMaster || serverSettings?.sectMasterId === user?.discordId;
   const userRank = user?.rank || "Outer Disciple";
   const rankInfo = rankHierarchy[userRank as keyof typeof rankHierarchy] || rankHierarchy["Outer Disciple"];
   
@@ -110,10 +133,20 @@ export default function Dashboard() {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <Crown className="w-16 h-16 text-purple-500 mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-white mb-2">Void Paragon</h1>
-          <p className="text-slate-400">Join a Discord server with the Void Paragon Bot to begin your cultivation journey</p>
+        <div className="text-center max-w-md space-y-8">
+          <div>
+            <Crown className="w-16 h-16 text-purple-500 mx-auto mb-4" />
+            <h1 className="text-4xl font-bold text-white mb-2">Void Paragon</h1>
+            <p className="text-slate-400">Join a Discord server with the Void Paragon Bot to begin your cultivation journey</p>
+          </div>
+          <Button 
+            onClick={() => window.location.href = "/api/auth/login"}
+            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-6 text-lg"
+            data-testid="button-discord-login"
+          >
+            <LogIn className="w-5 h-5 mr-2" />
+            Login with Discord
+          </Button>
         </div>
       </div>
     );
