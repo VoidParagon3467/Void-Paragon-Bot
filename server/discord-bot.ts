@@ -1776,6 +1776,63 @@ export class CultivationBot {
     }
   }
 
+  private getRankFromRealm(realmIndex: number): string {
+    // Realm index based rank promotion (perfectly tiered)
+    if (realmIndex >= 24) return "Supreme Sect Master"; // Realms 24-25 (GodKing, True God)
+    if (realmIndex >= 20) return "Heavenly Elder";      // Realms 20-23
+    if (realmIndex >= 17) return "Great Elder";         // Realms 17-19
+    if (realmIndex >= 14) return "Elder";               // Realms 14-16
+    if (realmIndex >= 11) return "Core Disciple";       // Realms 11-13
+    if (realmIndex >= 7) return "Inner Disciple";       // Realms 7-10
+    if (realmIndex >= 4) return "Inheritor Disciple";   // Realms 4-6
+    return "Outer Disciple";                            // Realms 1-3
+  }
+
+  private async checkAndPromoteRank(userId: string, serverId: string) {
+    try {
+      const user = await storage.getUserById(userId);
+      if (!user) return;
+
+      const realmIndex = cultivationRealms.indexOf(user.realm as any);
+      if (realmIndex === -1) return;
+
+      const newRank = this.getRankFromRealm(realmIndex);
+      
+      // Only promote, never demote
+      if (newRank !== user.rank && newRank !== "Outer Disciple") {
+        const oldRank = user.rank;
+        await storage.updateUser(userId, { rank: newRank } as any);
+
+        // Send rank promotion announcement
+        const guild = this.client.guilds.cache.get(serverId);
+        if (guild) {
+          const channels = await guild.channels.fetch();
+          let announcementChannel = channels.find((c: any) => c.name === "announcements" || c.name === "announcement") as any;
+          if (!announcementChannel) {
+            announcementChannel = channels.find((c: any) => c.name === "general") as any;
+          }
+
+          if (announcementChannel && 'send' in announcementChannel) {
+            const embed = new EmbedBuilder()
+              .setTitle("👑 RANK PROMOTION!")
+              .setDescription(`**${user.username}** has been promoted to **${newRank}**!`)
+              .addFields(
+                { name: "Previous Rank", value: oldRank || "Outer Disciple", inline: true },
+                { name: "New Rank", value: newRank, inline: true },
+                { name: "Current Realm", value: user.realm || "Connate Realm", inline: true }
+              )
+              .setColor(0xffaa00)
+              .setTimestamp();
+
+            await announcementChannel.send({ embeds: [embed] }).catch(console.error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking/promoting rank:", error);
+    }
+  }
+
   private async grantXp(userId: string, amount: number) {
     try {
       const user = await storage.getUserById(userId);
@@ -1833,6 +1890,32 @@ export class CultivationBot {
           xp: 0,
           voidCrystals: user.voidCrystals + 100,
         } as any);
+
+        // Check for rank promotion after breakthrough
+        await this.checkAndPromoteRank(user.id, interaction.guild.id);
+
+        // Send breakthrough announcement
+        const guild = interaction.guild;
+        const channels = await guild.channels.fetch();
+        let announcementChannel = channels.find((c: any) => c.name === "announcements" || c.name === "announcement") as any;
+        if (!announcementChannel) {
+          announcementChannel = channels.find((c: any) => c.name === "general") as any;
+        }
+
+        if (announcementChannel && 'send' in announcementChannel) {
+          const embed = new EmbedBuilder()
+            .setTitle("⚡ BREAKTHROUGH SUCCESS!")
+            .setDescription(`**${user.username}** has successfully broken through to **${nextRealm}**!`)
+            .addFields(
+              { name: "Previous Realm", value: user.realm || "Connate Realm", inline: true },
+              { name: "New Realm", value: nextRealm, inline: true },
+              { name: "Bonus Reward", value: "+100 Void Crystals", inline: true }
+            )
+            .setColor(0x00ff88)
+            .setTimestamp();
+
+          await announcementChannel.send({ embeds: [embed] }).catch(console.error);
+        }
 
         const embed = new EmbedBuilder()
           .setTitle("🌟 Breakthrough Successful!")
