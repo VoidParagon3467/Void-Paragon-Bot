@@ -3,21 +3,31 @@ import MissionSystem from "@/components/MissionSystem";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { queryClient } from "@/lib/queryClient";
 
-// Mock user data for demo - in production this would come from Discord auth
-const MOCK_USER = {
-  discordId: "123456789",
-  serverId: "987654321"
-};
+import { useState, useEffect } from "react";
 
 export default function Missions() {
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("auth_session");
+    if (stored) setSessionToken(stored);
+  }, []);
+
   // Fetch user data
-  const { data: user, isLoading: userLoading } = useQuery({
-    queryKey: [`/api/user/${MOCK_USER.discordId}/${MOCK_USER.serverId}`],
+  const { data: user = {}, isLoading: userLoading } = useQuery({
+    queryKey: [`/api/auth/me`, sessionToken],
+    queryFn: async () => {
+      if (!sessionToken) return {};
+      const res = await fetch(`/api/auth/me?session=${sessionToken}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
     retry: false,
+    enabled: !!sessionToken,
   });
 
   // WebSocket for real-time updates
-  useWebSocket(MOCK_USER.serverId, (message) => {
+  useWebSocket((user as any)?.serverId || '', (message) => {
     switch (message.type) {
       case 'missionCompleted':
         queryClient.invalidateQueries({ queryKey: ['/api/user-missions'] });

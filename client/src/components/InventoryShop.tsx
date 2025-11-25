@@ -15,11 +15,11 @@ export default function InventoryShop({ userId }: InventoryShopProps) {
   const [filter, setFilter] = useState("all");
   const { toast } = useToast();
 
-  const { data: userItems, isLoading: inventoryLoading } = useQuery({
+  const { data: userItems = [], isLoading: inventoryLoading } = useQuery({
     queryKey: [`/api/user-items/${userId}`],
   });
 
-  const { data: shopItems, isLoading: shopLoading } = useQuery({
+  const { data: shopItems = [], isLoading: shopLoading } = useQuery({
     queryKey: ['/api/items'],
   });
 
@@ -72,7 +72,7 @@ export default function InventoryShop({ userId }: InventoryShopProps) {
     }
   };
 
-  const filteredItems = userItems?.filter((userItem: any) => {
+  const filteredItems = (userItems as any[])?.filter((userItem: any) => {
     if (filter === "all") return true;
     return userItem.item.type === filter;
   }) || [];

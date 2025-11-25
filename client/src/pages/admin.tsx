@@ -3,28 +3,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";
-
-// Mock user data
-const MOCK_USER = {
-  discordId: "123456789",
-  serverId: "987654321"
-};
+import { useState, useEffect } from "react";
 
 export default function Admin() {
-  // Check if user is Sect Master
-  const { data: serverSettings, isLoading } = useQuery({
-    queryKey: [`/api/server-settings/${MOCK_USER.serverId}`],
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("auth_session");
+    if (stored) setSessionToken(stored);
+  }, []);
+
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: [`/api/auth/me`, sessionToken],
+    queryFn: async () => {
+      if (!sessionToken) return null;
+      const res = await fetch(`/api/auth/me?session=${sessionToken}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    retry: false,
+    enabled: !!sessionToken,
   });
 
-  const { data: stats } = useQuery({
-    queryKey: [`/api/stats/${MOCK_USER.serverId}`],
+  const { data: serverSettings = {}, isLoading: settingsLoading } = useQuery({
+    queryKey: [`/api/server-settings/${user?.serverId}`],
+    enabled: !!user?.serverId,
   });
 
-  const { data: users } = useQuery({
-    queryKey: [`/api/users/${MOCK_USER.serverId}`],
+  const { data: stats = {} } = useQuery({
+    queryKey: [`/api/stats/${user?.serverId}`],
+    enabled: !!user?.serverId,
   });
 
-  if (isLoading) {
+  const { data: users = [] } = useQuery({
+    queryKey: [`/api/users/${user?.serverId}`],
+    enabled: !!user?.serverId,
+  });
+
+  if (userLoading || settingsLoading) {
     return (
       <div className="starry-bg min-h-screen flex items-center justify-center">
         <div className="glass-card rounded-2xl p-8">
@@ -35,7 +51,7 @@ export default function Admin() {
     );
   }
 
-  const isSectMaster = serverSettings?.sectMasterId === MOCK_USER.discordId;
+  const isSectMaster = user?.isSupremeSectMaster || (serverSettings as any)?.sectMasterId === user?.discordId;
 
   if (!isSectMaster) {
     return (

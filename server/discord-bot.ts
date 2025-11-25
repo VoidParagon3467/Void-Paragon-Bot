@@ -248,6 +248,9 @@ export class CultivationBot {
     // Event participation XP every 3 minutes (very small XP)
     setInterval(() => this.distributeEventParticipationXp(), 3 * 60 * 1000);
 
+    // Mission alerts for disciples and elders - every 24 hours (PRIVATE DMs)
+    setInterval(() => this.sendMissionAlerts(), 24 * 60 * 60 * 1000);
+
     // Also run these immediately on startup
     this.distributeDailyResources().catch(console.error);
     this.autoGenerateTreasures().catch(console.error);
@@ -259,6 +262,7 @@ export class CultivationBot {
     this.autoGenerateBloodlines().catch(console.error);
     this.postHallOfFameLeaderboards().catch(console.error);
     this.postPremiumRewards().catch(console.error);
+    this.sendMissionAlerts().catch(console.error);
   }
 
   private async postPremiumRewards() {
@@ -3645,6 +3649,94 @@ Be conversational, use cultivation terminology naturally, and keep responses und
       console.log("✅ Daily activity report completed");
     } catch (error) {
       console.error("Error reporting daily activity:", error);
+    }
+  }
+
+  private async sendMissionAlerts() {
+    try {
+      console.log("📬 Sending private mission alerts to disciples and elders...");
+      const guilds = Array.from(this.client.guilds.cache.entries());
+
+      for (const [serverId] of guilds) {
+        try {
+          const users = await storage.getUsersInServer(serverId);
+          
+          // Filter disciples and elders (excluding Supreme Sect Master)
+          const discipAndElders = users.filter(u => {
+            const rank = u.rank || "Outer Disciple";
+            const allRanks = ["Outer Disciple", "Inheritor Disciple", "Inner Disciple", "Core Disciple", "Elder", "Great Elder", "Heavenly Elder"];
+            return allRanks.includes(rank) && !u.isSupremeSectMaster;
+          });
+
+          for (const user of discipAndElders) {
+            try {
+              // Get user's active missions
+              const allMissions = await storage.getUserMissions(user.id);
+              const dailyMissions = (allMissions || []).filter((m: any) => m.mission?.type === 'daily' && m.status === 'active');
+              const monthlyMissions = (allMissions || []).filter((m: any) => m.mission?.type === 'monthly' && m.status === 'active');
+
+              if (dailyMissions.length === 0 && monthlyMissions.length === 0) continue;
+
+              // Try to send private DM
+              const discordUser = await this.client.users.fetch(user.discordId).catch(() => null);
+              if (!discordUser) continue;
+
+              // Build embed with mission details
+              const embed = new EmbedBuilder()
+                .setTitle("📜 Mission Alert - Void Paragon Bot")
+                .setDescription(`Greetings, ${user.username}! Here are your active missions for today.`)
+                .setColor(0x9966ff)
+                .setFooter({ text: `Realm: ${user.realm} | Rank: ${user.rank}` })
+                .setTimestamp();
+
+              // Add daily missions
+              if (dailyMissions.length > 0) {
+                const dailyDesc = dailyMissions.map((m: any) => {
+                  const progress = m.progress || {};
+                  const requirements = m.mission?.requirements || {};
+                  const desc = m.mission?.description || "Complete this mission";
+                  const reward = m.mission?.reward || 0;
+                  return `• **${m.mission?.name}**\n  ${desc}\n  💰 Reward: ${reward} XP`;
+                }).join("\n\n");
+                
+                embed.addFields({
+                  name: `📅 Daily Missions (${dailyMissions.length})`,
+                  value: dailyDesc || "No daily missions",
+                  inline: false,
+                });
+              }
+
+              // Add monthly missions
+              if (monthlyMissions.length > 0) {
+                const monthlyDesc = monthlyMissions.map((m: any) => {
+                  const desc = m.mission?.description || "Complete this mission";
+                  const reward = m.mission?.reward || 0;
+                  return `• **${m.mission?.name}**\n  ${desc}\n  💰 Reward: ${reward} XP`;
+                }).join("\n\n");
+                
+                embed.addFields({
+                  name: `📆 Monthly Missions (${monthlyMissions.length})`,
+                  value: monthlyDesc || "No monthly missions",
+                  inline: false,
+                });
+              }
+
+              // Send private DM
+              await discordUser.send({ embeds: [embed] }).catch(console.error);
+            } catch (userError) {
+              console.error(`Error sending mission alert to user ${user.discordId}:`, userError);
+            }
+          }
+
+          await this.logBotEvent(serverId, "Missions", `📬 Mission alerts sent to ${discipAndElders.length} disciples and elders`);
+        } catch (guildError) {
+          console.error(`Error sending mission alerts for guild ${serverId}:`, guildError);
+        }
+      }
+
+      console.log("✅ Mission alerts completed");
+    } catch (error) {
+      console.error("Error sending mission alerts:", error);
     }
   }
 

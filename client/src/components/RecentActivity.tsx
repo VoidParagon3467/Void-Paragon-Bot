@@ -7,7 +7,7 @@ interface RecentActivityProps {
 }
 
 export default function RecentActivity({ serverId }: RecentActivityProps) {
-  const { data: activities, isLoading } = useQuery({
+  const { data: activities = [], isLoading } = useQuery({
     queryKey: [`/api/activities/${serverId}`],
   });
 
@@ -81,7 +81,7 @@ export default function RecentActivity({ serverId }: RecentActivityProps) {
     },
   ];
 
-  const displayActivities = activities?.length > 0 ? activities : mockActivities;
+  const displayActivities = (activities as any[])?.length > 0 ? activities : mockActivities;
 
   return (
     <Card className="glass-card border-primary/30">

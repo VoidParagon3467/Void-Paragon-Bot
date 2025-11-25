@@ -33,7 +33,7 @@ export default function Inventory() {
     enabled: !!user?.serverId,
   });
 
-  const isSectMaster = user?.isSupremeSectMaster || serverSettings?.sectMasterId === user?.discordId;
+  const isSectMaster = user?.isSupremeSectMaster || (serverSettings as any)?.sectMasterId === user?.discordId;
 
   // WebSocket for real-time updates
   useWebSocket(user?.serverId || '', (message) => {

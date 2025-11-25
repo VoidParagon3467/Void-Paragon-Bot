@@ -9,11 +9,11 @@ interface MissionSystemProps {
 }
 
 export default function MissionSystem({ userId }: MissionSystemProps) {
-  const { data: missions, isLoading } = useQuery({
+  const { data: missions = [], isLoading } = useQuery({
     queryKey: [`/api/user-missions/${userId}`],
   });
 
-  const activeMissions = missions?.filter((m: any) => m.status === 'active') || [];
+  const activeMissions = (missions as any[])?.filter((m: any) => m.status === 'active') || [];
 
   const getMissionColor = (type: string) => {
     switch (type) {
