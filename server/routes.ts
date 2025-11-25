@@ -675,6 +675,107 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       res.status(500).json({ error: "Failed to fetch missions" });
     }
   });
+
+  // Shop endpoints - VC items (most common, regenerate every few hours)
+  app.get("/api/shop/vc", async (req: Request, res: Response) => {
+    try {
+      const items = [
+        { id: 1, name: "Iron Sword", type: "weapon", rarity: "common", price: 100, currency: "vc" },
+        { id: 2, name: "Lesser Healing Pill", type: "pill", rarity: "common", price: 50, currency: "vc" },
+        { id: 3, name: "Bronze Treasure", type: "treasure", rarity: "uncommon", price: 200, currency: "vc" },
+      ];
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shop items" });
+    }
+  });
+
+  // SP items (rare, regenerate daily)
+  app.get("/api/shop/sp", async (req: Request, res: Response) => {
+    try {
+      const items = [
+        { id: 10, name: "Rare Sword", type: "weapon", rarity: "rare", price: 500, currency: "sp" },
+        { id: 11, name: "Mystic Bloodline", type: "bloodline", rarity: "rare", price: 1000, currency: "sp" },
+        { id: 12, name: "Silver Treasure", type: "treasure", rarity: "epic", price: 800, currency: "sp" },
+      ];
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shop items" });
+    }
+  });
+
+  // Karma items (legendary, regenerate randomly)
+  app.get("/api/shop/karma", async (req: Request, res: Response) => {
+    try {
+      const items = [
+        { id: 20, name: "Divine Sword", type: "weapon", rarity: "legendary", price: 5000, currency: "karma" },
+        { id: 21, name: "Celestial Bloodline", type: "bloodline", rarity: "mythical", price: 10000, currency: "karma" },
+        { id: 22, name: "God-Tier Treasure", type: "treasure", rarity: "mythical", price: 15000, currency: "karma" },
+      ];
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shop items" });
+    }
+  });
+
+  // Buy item endpoint
+  app.post("/api/shop/buy", async (req: Request, res: Response) => {
+    try {
+      const { userId, itemId, currency } = req.body;
+      if (!userId || !itemId || !currency) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      // TODO: Implement purchase logic with inventory checks and currency deduction
+      // Broadcast via WebSocket to all clients
+      broadcast(req.body.serverId || "", {
+        type: "itemPurchased",
+        userId,
+        itemId,
+        currency
+      });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process purchase" });
+    }
+  });
+
+  // Use item endpoint (equip, consume, activate, learn, etc.)
+  app.post("/api/inventory/use", async (req: Request, res: Response) => {
+    try {
+      const { userId, itemId, itemType } = req.body;
+      if (!userId || !itemId || !itemType) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Simulate different item effects based on type
+      const effects: Record<string, string> = {
+        weapon: `⚔️ Equipped weapon! Power increased!`,
+        pill: `💊 Consumed pill! Gained 1 level!`,
+        treasure: `✨ Treasure activated! +500 XP earned!`,
+        bloodline: `🔥 Bloodline activated! Stats boosted!`,
+        skill: `📚 Skill learned! New ability unlocked!`,
+      };
+
+      const message = effects[itemType] || "Item used successfully";
+
+      // Broadcast via WebSocket to all clients
+      broadcast("", {
+        type: "itemUsed",
+        userId,
+        itemId,
+        itemType,
+        message
+      });
+
+      res.json({ 
+        success: true,
+        message,
+        effect: itemType
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to use item" });
+    }
+  });
   
   return httpServer;
 }

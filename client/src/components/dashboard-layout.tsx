@@ -19,6 +19,7 @@ export function DashboardLayout({ children, user, onLogout }: DashboardLayoutPro
     { path: "/", label: "Profile", icon: Home },
     { path: "/spar", label: "Spar", icon: Swords },
     { path: "/inventory", label: "Inventory", icon: Backpack },
+    { path: "/shop", label: "Shop", icon: Gift },
     { path: "/missions", label: "Missions", icon: Scroll },
     { path: "/events", label: "Events", icon: Zap },
     { path: "/factions", label: "Factions", icon: Users },

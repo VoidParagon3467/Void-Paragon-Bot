@@ -8,6 +8,7 @@ import Login from "@/pages/login";
 import ProfilePage from "@/pages/profile";
 import SparPage from "@/pages/spar";
 import InventoryPage from "@/pages/inventory";
+import ShopPage from "@/pages/shop";
 import MissionsPage from "@/pages/missions";
 import EventsPage from "@/pages/events";
 import FactionsPage from "@/pages/factions";
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/spar" component={SparPage} />
       <Route path="/inventory" component={InventoryPage} />
+      <Route path="/shop" component={ShopPage} />
       <Route path="/missions" component={MissionsPage} />
       <Route path="/events" component={EventsPage} />
       <Route path="/factions" component={FactionsPage} />
