@@ -55,13 +55,17 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
     ws.on('close', () => {
       if (ws.serverId) {
         console.log(`[WebSocket] Client disconnected from server: ${ws.serverId}`);
-        // Unregister from EventBus
+        // Unregister from EventBus (CRITICAL: prevent memory leak)
         eventBus.unregisterWsClient(ws.serverId, ws);
       }
     });
 
     ws.on('error', (error) => {
       console.error('[WebSocket] Error:', error);
+      // CRITICAL: Unregister on error too (prevent stale connections)
+      if (ws.serverId) {
+        eventBus.unregisterWsClient(ws.serverId, ws);
+      }
     });
   });
   
