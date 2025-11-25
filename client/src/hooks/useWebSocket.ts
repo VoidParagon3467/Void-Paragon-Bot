@@ -15,8 +15,11 @@ export function useWebSocket(serverId: string, onMessage?: (message: WebSocketMe
   const connect = () => {
     try {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const host = window.location.hostname;
+      const port = window.location.port;
+      const wsUrl = port ? `${protocol}//${host}:${port}/ws` : `${protocol}//${host}/ws`;
       
+      console.log('[WebSocket] Connecting to:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
       
       wsRef.current.onopen = () => {
