@@ -1,66 +1,101 @@
 import { useQuery } from "@tanstack/react-query";
-import MissionSystem from "@/components/MissionSystem";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { queryClient } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DashboardLayout } from "@/components/dashboard-layout";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
+import { Scroll } from "lucide-react";
 
-import { useState, useEffect } from "react";
+interface User {
+  id: number;
+  username: string;
+  rank: string;
+  realm: string;
+  level: number;
+  voidCrystals: number;
+}
 
-export default function Missions() {
+interface Mission {
+  id: number;
+  name: string;
+  type: string;
+  status: string;
+  progress?: number;
+}
+
+export default function MissionsPage() {
+  const [, setLocation] = useLocation();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem("auth_session");
-    if (stored) setSessionToken(stored);
-  }, []);
+    const token = sessionStorage.getItem("auth_session");
+    if (!token) setLocation("/login");
+    else setSessionToken(token);
+  }, [setLocation]);
 
-  // Fetch user data
-  const { data: user = {}, isLoading: userLoading } = useQuery({
+  const { data: user } = useQuery<User | null>({
     queryKey: [`/api/auth/me`, sessionToken],
     queryFn: async () => {
-      if (!sessionToken) return {};
+      if (!sessionToken) return null;
       const res = await fetch(`/api/auth/me?session=${sessionToken}`);
-      if (!res.ok) return {};
-      return res.json();
+      return res.ok ? res.json() : null;
     },
-    retry: false,
     enabled: !!sessionToken,
   });
 
-  // WebSocket for real-time updates
-  useWebSocket((user as any)?.serverId || '', (message) => {
-    switch (message.type) {
-      case 'missionCompleted':
-        queryClient.invalidateQueries({ queryKey: ['/api/user-missions'] });
-        break;
-    }
+  const { data: missions = [] } = useQuery<Mission[]>({
+    queryKey: [`/api/missions`, user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const res = await fetch(`/api/missions?userId=${user.id}`);
+      return res.ok ? res.json() : [];
+    },
+    enabled: !!user?.id,
   });
 
-  if (userLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-blue-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+  const handleLogout = () => {
+    sessionStorage.removeItem("auth_session");
+    setLocation("/login");
+  };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-blue-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Cultivator Not Found</h1>
-          <p className="text-gray-300">Begin your cultivation journey by joining a Discord server with Void Paragon Bot.</p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return <div className="p-8">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-blue-900">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <MissionSystem userId={user.id} />
+    <DashboardLayout user={user} onLogout={handleLogout}>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center gap-2">
+          <Scroll className="w-6 h-6" />
+          <h1 className="text-3xl font-bold">Missions</h1>
         </div>
+
+        {missions.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>No Active Missions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">No missions available at the moment.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {missions.map((mission) => (
+              <Card key={mission.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{mission.name}</CardTitle>
+                    <Badge variant="outline">{mission.type}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">Status: {mission.status}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

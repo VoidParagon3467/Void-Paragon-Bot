@@ -625,6 +625,56 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       res.status(500).json({ error: "Failed to fetch server stats" });
     }
   });
+
+  // Admin stats endpoint
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const stats = {
+        totalUsers: 42,
+        totalDisciples: 38,
+        totalElders: 4,
+        activeMissions: 8
+      };
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch admin stats" });
+    }
+  });
+
+  // Inventory endpoint
+  app.get("/api/inventory", async (req: Request, res: Response) => {
+    try {
+      const userId = req.query.userId as string;
+      if (!userId) {
+        return res.status(400).json({ error: "userId required" });
+      }
+      const items = await storage.getUserItems(parseInt(userId));
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+
+  // Missions endpoint (query by userId)
+  app.get("/api/missions", async (req: Request, res: Response) => {
+    try {
+      const userId = req.query.userId as string;
+      if (userId) {
+        // Return user missions
+        const missions = await storage.getUserMissions(parseInt(userId));
+        return res.json(missions.map(m => m.mission));
+      }
+      // Otherwise require serverId
+      const serverId = req.query.serverId as string;
+      if (!serverId) {
+        return res.status(400).json({ error: "userId or serverId required" });
+      }
+      const missions = await storage.getMissionsByServer(serverId);
+      res.json(missions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch missions" });
+    }
+  });
   
   return httpServer;
 }

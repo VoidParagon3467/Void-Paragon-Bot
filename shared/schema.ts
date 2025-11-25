@@ -23,16 +23,46 @@ export const cultivationRealms = [
 
 export const realmEnum = pgEnum("realm", cultivationRealms);
 
-// Rank hierarchy with daily VC multipliers
+// Rank hierarchy with daily VC multipliers (CORRECT ORDER)
 export const rankHierarchy = {
-  "Supreme Sect Master": { multiplier: 100, level: 15 },
-  "Heavenly Elder": { multiplier: 8, level: 14 },
-  "Great Elder": { multiplier: 6, level: 13 },
-  "Elder": { multiplier: 4, level: 12 },
-  "Core Disciple": { multiplier: 3, level: 11 },
-  "Inner Disciple": { multiplier: 2, level: 10 },
-  "Inheritor Disciple": { multiplier: 1.5, level: 9 },
-  "Outer Disciple": { multiplier: 1, level: 1 },
+  "Supreme Sect Master": { multiplier: 100, level: 9, permissions: ["all"] },
+  "Heavenly Elder": { multiplier: 8, level: 8, permissions: ["disciples", "events", "moderation", "treasury", "ranks", "missions", "announcements", "logs"] },
+  "Great Elder": { multiplier: 6, level: 7, permissions: ["moderation", "treasury", "clan_creation"] },
+  "Elder": { multiplier: 4, level: 6, permissions: ["moderation", "treasury"] },
+  "Guardians": { multiplier: 2, level: 5, permissions: ["moderation_minor"] },
+  "Inheritor Disciple": { multiplier: 1.5, level: 4, permissions: ["faction_creation"] },
+  "Core Disciple": { multiplier: 3, level: 3, permissions: [] },
+  "Inner Disciple": { multiplier: 2, level: 2, permissions: [] },
+  "Outer Disciple": { multiplier: 1, level: 1, permissions: [] },
+} as const;
+
+// Realm levels configuration
+export const realmLevels: Record<string, number> = {
+  "Connate Realm": 9,
+  "Yin Realm": 9,
+  "Yang Realm": 9,
+  "Spirit Realm": 9,
+  "Imperial Realm": 9,
+  "Deity Realm": 3,
+  "Dao Realm": 3,
+  "True Spirit Realm": 3,
+  "Martial Spirit Realm": 3,
+  "Heavenly Spirit Realm": 9,
+  "True Emperor Realm": 3,
+  "Martial Emperor Realm": 3,
+  "Heavenly Emperor Realm": 3,
+  "Sovereign Emperor Realm": 3,
+  "Divine Emperor Realm": 3,
+  "Divine Lord Realm": 3,
+  "Divine King Realm": 3,
+  "World King Realm": 3,
+  "Immortal Ascension Realm": 3,
+  "Immortal Lord Realm": 3,
+  "Immortal King Realm": 3,
+  "Immortal Emperor Realm": 3,
+  "Immortal God Realm": 3,
+  "GodKing Realm": 3,
+  "True God Realm": 0, // No levels - end point
 } as const;
 
 // Users/Players table
