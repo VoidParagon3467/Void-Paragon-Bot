@@ -4,12 +4,14 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { cultivationService } from "./cultivation";
 import { missionService } from "./missions";
+import { eventBus } from "./event-bus";
 import { insertUserSchema, insertFactionSchema } from "@shared/schema";
 import { EmbedBuilder } from "discord.js";
 
-// Extend WebSocket type to include serverId
+// Extend WebSocket type to include serverId and userId
 interface ExtendedWebSocket extends WebSocket {
   serverId?: string;
+  userId?: number;
 }
 
 // Generate simple session token
@@ -27,7 +29,7 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   wss.on('connection', (ws: ExtendedWebSocket) => {
-    console.log('Client connected to WebSocket');
+    console.log('[WebSocket] Client connected');
     
     ws.on('message', (message) => {
       try {
@@ -36,25 +38,40 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
         switch (data.type) {
           case 'subscribe':
             // Subscribe to updates for specific server
-            ws.serverId = data.serverId;
+            ws.serverId = data.serverId ?? "default";
+            ws.userId = data.userId;
+            // Register with EventBus for targeted broadcasts
+            if (ws.serverId) {
+              eventBus.registerWsClient(ws.serverId, ws);
+              console.log(`[WebSocket] Client subscribed to server: ${ws.serverId}`);
+            }
             break;
         }
       } catch (error) {
-        console.error('WebSocket message error:', error);
+        console.error('[WebSocket] Message error:', error);
       }
     });
     
     ws.on('close', () => {
-      console.log('Client disconnected from WebSocket');
+      if (ws.serverId) {
+        console.log(`[WebSocket] Client disconnected from server: ${ws.serverId}`);
+        // Unregister from EventBus
+        eventBus.unregisterWsClient(ws.serverId, ws);
+      }
+    });
+
+    ws.on('error', (error) => {
+      console.error('[WebSocket] Error:', error);
     });
   });
   
-  // Broadcast function for real-time updates
+  // Legacy broadcast function (now delegates to EventBus)
+  // Used by existing code - maintains backward compatibility
   const broadcast = (serverId: string, data: any) => {
-    wss.clients.forEach((client: ExtendedWebSocket) => {
-      if (client.readyState === WebSocket.OPEN && client.serverId === serverId) {
-        client.send(JSON.stringify(data));
-      }
+    eventBus.broadcastToServer({
+      ...data,
+      serverId: serverId || "default",
+      timestamp: new Date(),
     });
   };
 
