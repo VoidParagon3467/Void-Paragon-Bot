@@ -81,13 +81,24 @@ export default function Dashboard() {
     }
   }, []);
 
-  const { data: user, isLoading: userLoading } = useQuery<User | null>({
+  const { data: user, isLoading: userLoading, error: userError } = useQuery<User | null>({
     queryKey: [`/api/auth/me`, sessionToken],
     queryFn: async () => {
-      if (!sessionToken) return null;
+      if (!sessionToken) {
+        console.log("❌ No session token found");
+        return null;
+      }
+      console.log("🔍 Fetching user with session:", sessionToken.substring(0, 10) + "...");
       const res = await fetch(`/api/auth/me?session=${sessionToken}`);
-      if (!res.ok) return null;
-      return res.json();
+      console.log("📡 /api/auth/me response status:", res.status);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ API error:", res.status, errorText);
+        return null;
+      }
+      const userData = await res.json();
+      console.log("✅ User loaded:", userData.username);
+      return userData;
     },
     retry: false,
     enabled: !!sessionToken,
