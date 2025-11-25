@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, decimal, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, decimal, pgEnum, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -38,7 +38,7 @@ export const rankHierarchy = {
 // Users/Players table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  discordId: text("discord_id").notNull().unique(),
+  discordId: text("discord_id").notNull(),
   username: text("username").notNull(),
   avatar: text("avatar"),
   // Cultivation stats - following exact user specification
@@ -83,7 +83,9 @@ export const users = pgTable("users", {
   lastDailyRewardAt: timestamp("last_daily_reward_at"),
   // Discord server specific
   serverId: text("server_id").notNull(),
-});
+}, (table) => ({
+  discordServerUnique: unique().on(table.discordId, table.serverId),
+}));
 
 // Bloodlines table
 export const bloodlines = pgTable("bloodlines", {
