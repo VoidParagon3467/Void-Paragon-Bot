@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { ShoppingCart, Gem } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface User {
   id: number;
@@ -31,6 +32,9 @@ interface ShopItem {
 export default function ShopPage() {
   const [, setLocation] = useLocation();
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [buying, setBuying] = useState<number | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const token = sessionStorage.getItem("auth_session");
@@ -38,7 +42,7 @@ export default function ShopPage() {
     else setSessionToken(token);
   }, []);
 
-  const { data: user } = useQuery<User | null>({
+  const { data: user, refetch: refetchUser } = useQuery<User | null>({
     queryKey: [`/api/auth/me`, sessionToken],
     queryFn: async () => {
       if (!sessionToken) return null;
@@ -79,11 +83,26 @@ export default function ShopPage() {
 
   const handleBuy = async (itemId: number, currency: string) => {
     if (!user?.id) return;
-    fetch(`/api/shop/buy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, itemId, currency }),
-    }).catch(() => {});
+    setBuying(itemId);
+    try {
+      const res = await fetch(`/api/shop/buy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, itemId, currency }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "✅ Purchase successful!", description: data.message });
+        refetchUser();
+        queryClient.invalidateQueries({ queryKey: [`/api/inventory`, user.id] });
+      } else {
+        toast({ title: "❌ Purchase failed", description: data.error, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({ title: "❌ Error", description: "Failed to process purchase", variant: "destructive" });
+    } finally {
+      setBuying(null);
+    }
   };
 
   if (!user) return <div className="p-8">Loading...</div>;
@@ -131,12 +150,12 @@ export default function ShopPage() {
                 <CardContent className="flex items-center justify-between">
                   <p className="text-lg font-bold text-amber-500">{item.price} VC</p>
                   <Button
-                    disabled={user.voidCrystals < item.price}
+                    disabled={user.voidCrystals < item.price || buying === item.id}
                     onClick={() => handleBuy(item.id, "vc")}
                     data-testid={`button-buy-vc-${item.id}`}
                     className="active-elevate-2"
                   >
-                    Buy
+                    {buying === item.id ? "..." : "Buy"}
                   </Button>
                 </CardContent>
               </Card>
@@ -159,12 +178,12 @@ export default function ShopPage() {
                 <CardContent className="flex items-center justify-between">
                   <p className="text-lg font-bold text-blue-400">{item.price} SP</p>
                   <Button
-                    disabled={user.sectPoints < item.price}
+                    disabled={user.sectPoints < item.price || buying === item.id}
                     onClick={() => handleBuy(item.id, "sp")}
                     data-testid={`button-buy-sp-${item.id}`}
                     className="active-elevate-2"
                   >
-                    Buy
+                    {buying === item.id ? "..." : "Buy"}
                   </Button>
                 </CardContent>
               </Card>
@@ -187,12 +206,12 @@ export default function ShopPage() {
                 <CardContent className="flex items-center justify-between">
                   <p className="text-lg font-bold text-purple-400">{item.price} Karma</p>
                   <Button
-                    disabled={user.karma < item.price}
+                    disabled={user.karma < item.price || buying === item.id}
                     onClick={() => handleBuy(item.id, "karma")}
                     data-testid={`button-buy-karma-${item.id}`}
                     className="active-elevate-2"
                   >
-                    Buy
+                    {buying === item.id ? "..." : "Buy"}
                   </Button>
                 </CardContent>
               </Card>

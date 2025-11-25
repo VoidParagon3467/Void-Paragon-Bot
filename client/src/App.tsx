@@ -66,11 +66,39 @@ function SessionHandler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ThemeToggle() {
+  const [isDark, setIsDark] = useState(() => {
+    return localStorage.getItem("theme") !== "light";
+  });
+
+  const toggleTheme = () => {
+    const newIsDark = !isDark;
+    setIsDark(newIsDark);
+    localStorage.setItem("theme", newIsDark ? "dark" : "light");
+    if (newIsDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDark]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="dark">
+          <ThemeToggle />
           <SessionHandler>
             <Toaster />
             <Router />

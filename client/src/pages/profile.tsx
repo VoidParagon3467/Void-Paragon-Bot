@@ -66,6 +66,9 @@ export default function ProfilePage() {
   const nextLevelXp = Math.floor((user.level || 1) * 100 * (1.5 ** (user.level || 1)));
   const xpProgress = Math.min(((user.xp || 0) / nextLevelXp) * 100, 100);
 
+  const factionDisplay = user.factionName || "Not joined";
+  const clanDisplay = user.clanName || "Not joined";
+
   const handleLogout = () => {
     sessionStorage.removeItem("auth_session");
     setLocation("/login");

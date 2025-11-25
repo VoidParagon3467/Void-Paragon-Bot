@@ -629,14 +629,22 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
   // Admin stats endpoint
   app.get("/api/admin/stats", async (req, res) => {
     try {
+      // Get first server (typical setup has one main server)
+      const serverId = botClient?.guilds.cache.first()?.id || "";
+      const allUsers = await storage.getUsersInServer(serverId);
+      const totalUsers = allUsers.length;
+      const elders = allUsers.filter((u: any) => ["Elder", "Great Elder", "Heavenly Elder", "Supreme Sect Master"].includes(u.rank));
+      const activeMissions = (await storage.getMissionsByServer(serverId)).filter((m: any) => m.status === "active").length;
+      
       const stats = {
-        totalUsers: 42,
-        totalDisciples: 38,
-        totalElders: 4,
-        activeMissions: 8
+        totalUsers: totalUsers,
+        totalDisciples: allUsers.filter((u: any) => u.rank.includes("Disciple")).length,
+        totalElders: elders.length,
+        activeMissions: activeMissions
       };
       res.json(stats);
     } catch (error) {
+      console.error("Admin stats error:", error);
       res.status(500).json({ error: "Failed to fetch admin stats" });
     }
   });
@@ -725,16 +733,46 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       if (!userId || !itemId || !currency) {
         return res.status(400).json({ error: "Missing required fields" });
       }
-      // TODO: Implement purchase logic with inventory checks and currency deduction
-      // Broadcast via WebSocket to all clients
+
+      // Get item and user
+      const items = await storage.getItems();
+      const item = items.find((i: any) => i.id === itemId);
+      if (!item) {
+        return res.status(404).json({ error: "Item not found" });
+      }
+
+      const user = await storage.getUserWithDetails(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Check currency
+      const currencyField = currency === "vc" ? "voidCrystals" : currency === "sp" ? "sectPoints" : "karma";
+      if ((user as any)[currencyField] < item.price) {
+        return res.status(400).json({ error: "Not enough currency" });
+      }
+
+      // Deduct currency
+      const updatedUser = await storage.updateUser(userId, {
+        [currencyField]: (user as any)[currencyField] - item.price
+      });
+
+      // Add item to inventory
+      await storage.addItemToUser(userId, itemId, 1);
+
+      // Broadcast
       broadcast(req.body.serverId || "", {
         type: "itemPurchased",
         userId,
         itemId,
-        currency
+        itemName: item.name,
+        currency,
+        newBalance: (updatedUser as any)[currencyField]
       });
-      res.json({ success: true });
+
+      res.json({ success: true, message: `Purchased ${item.name}!` });
     } catch (error) {
+      console.error("Shop buy error:", error);
       res.status(500).json({ error: "Failed to process purchase" });
     }
   });
