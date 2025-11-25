@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { Swords, Zap, Shield, Zenigata } from "lucide-react";
+import { Swords, Zap, Shield, Gauge } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
@@ -160,7 +160,7 @@ export default function SparPage() {
                     <p className="font-bold">{user.defense || user.level * 8}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground flex items-center gap-1"><Zenigata className="w-3 h-3" />Agility</span>
+                    <span className="text-muted-foreground flex items-center gap-1"><Gauge className="w-3 h-3" />Agility</span>
                     <p className="font-bold">{user.agility || user.level * 7}</p>
                   </div>
                   <div>
