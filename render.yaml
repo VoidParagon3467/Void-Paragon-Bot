@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: void-paragon-bot
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: NODE_ENV=production node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        scope: run
+      - key: DISCORD_TOKEN
+        scope: run
+      - key: SESSION_SECRET
+        scope: run
+      - key: OPENAI_API_KEY
+        scope: run
