@@ -245,6 +245,33 @@ export const userItems = pgTable("user_items", {
   acquiredAt: timestamp("acquired_at").defaultNow(),
 });
 
+// Skills table (combat abilities)
+export const skills = pgTable("skills", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  rarity: rarityEnum("rarity").notNull(),
+  skillType: text("skill_type").notNull(), // "offensive", "defensive", "supporting"
+  minRankLevel: integer("min_rank_level").notNull().default(1), // 1=Outer, 2=Inheritor, 3=Inner, 4=Core, 5=Elder, 6=Great Elder, 7=Heavenly Elder, 8=Sect Master
+  powerBonus: integer("power_bonus").notNull().default(0),
+  defenseBonus: integer("defense_bonus").notNull().default(0),
+  agilityBonus: integer("agility_bonus").notNull().default(0),
+  wisdomBonus: integer("wisdom_bonus").notNull().default(0),
+  price: integer("price").notNull().default(0), // Price in Void Crystals
+  specialEffect: text("special_effect"), // e.g., "50% crit chance", "stun enemy", "heal 20% HP"
+  icon: text("icon"),
+});
+
+// User skills inventory
+export const userSkills = pgTable("user_skills", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  skillId: integer("skill_id").notNull(),
+  isEquipped: boolean("is_equipped").notNull().default(false),
+  level: integer("level").notNull().default(1), // Skill mastery level
+  acquiredAt: timestamp("acquired_at").defaultNow(),
+});
+
 // Missions table
 export const missions = pgTable("missions", {
   id: serial("id").primaryKey(),

@@ -66,6 +66,11 @@ export interface IStorage {
   getWeaponById(id: number): Promise<Weapon | undefined>;
   createWeapon(weapon: any): Promise<Weapon>;
 
+  // Skill operations
+  getSkills(): Promise<any[]>;
+  getSkillById(id: number): Promise<any | undefined>;
+  createSkill(skill: any): Promise<any>;
+
   // Breakthrough Treasure operations
   getBreakthroughTreasures(): Promise<BreakthroughTreasure[]>;
   getBreakthroughTreasureById(id: number): Promise<BreakthroughTreasure | undefined>;
@@ -410,6 +415,23 @@ export class DatabaseStorage implements IStorage {
   async createWeapon(weapon: any): Promise<Weapon> {
     const [newWeapon] = await db.insert(weapons).values(weapon).returning();
     return newWeapon;
+  }
+
+  async getSkills(): Promise<any[]> {
+    const { skills } = await import("@shared/schema");
+    return await db.select().from(skills);
+  }
+
+  async getSkillById(id: number): Promise<any | undefined> {
+    const { skills } = await import("@shared/schema");
+    const [skill] = await db.select().from(skills).where(eq(skills.id, id));
+    return skill || undefined;
+  }
+
+  async createSkill(skill: any): Promise<any> {
+    const { skills } = await import("@shared/schema");
+    const [newSkill] = await db.insert(skills).values(skill).returning();
+    return newSkill;
   }
 
   async getBreakthroughTreasures(): Promise<BreakthroughTreasure[]> {
