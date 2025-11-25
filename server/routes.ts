@@ -118,6 +118,41 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
         return res.redirect("/?error=no_guild");
       }
 
+      // Create or get user
+      let user = await storage.getUserByDiscordId(userData.id, firstGuild);
+      const isSupremeSectMaster = userData.id === "1344237246240391272";
+      
+      if (!user) {
+        user = await storage.createUser({
+          discordId: userData.id,
+          username: userData.username,
+          avatar: userData.avatar,
+          serverId: firstGuild,
+          realm: isSupremeSectMaster ? "True God Realm" : "Connate Realm",
+          level: isSupremeSectMaster ? 25 : 1,
+          xp: 0,
+          rank: isSupremeSectMaster ? "Supreme Sect Master" : "Outer Disciple",
+          voidCrystals: isSupremeSectMaster ? 999999 : 100,
+          sectPoints: isSupremeSectMaster ? 999999 : 50,
+          karma: isSupremeSectMaster ? 999999 : 0,
+          fate: isSupremeSectMaster ? 999999 : 0,
+          isPremium: true,
+          rebirthCount: 0,
+          isMeditating: false,
+          isSupremeSectMaster,
+        });
+        console.log(`✅ New user created: ${userData.username} (${userData.id}) in server ${firstGuild}${isSupremeSectMaster ? " 👑 AS SUPREME SECT MASTER!" : ""}`);
+      } else if (isSupremeSectMaster && !user.isSupremeSectMaster) {
+        // Upgrade existing user to Supreme Sect Master if they log in with your ID
+        user = await storage.updateUser(user.id, {
+          isSupremeSectMaster: true,
+          rank: "Supreme Sect Master",
+          realm: "True God Realm",
+          level: 25,
+        });
+        console.log(`👑 User upgraded to Supreme Sect Master: ${userData.username}`);
+      }
+
       // Store session in database (24 hour expiry)
       const sessionToken = generateSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS);
