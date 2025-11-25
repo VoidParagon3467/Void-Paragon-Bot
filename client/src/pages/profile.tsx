@@ -32,8 +32,15 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const token = sessionStorage.getItem("auth_session");
-    if (!token) setLocation("/login");
-    else setSessionToken(token);
+    console.log("[ProfilePage] useEffect - token:", token?.substring(0, 10));
+    if (!token) {
+      console.log("[ProfilePage] NO TOKEN - redirecting to login");
+      setLocation("/login");
+    }
+    else {
+      console.log("[ProfilePage] TOKEN FOUND - setting sessionToken");
+      setSessionToken(token);
+    }
   }, []);
 
   const { data: user, isLoading } = useQuery<User | null>({

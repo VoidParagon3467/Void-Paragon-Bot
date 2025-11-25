@@ -46,11 +46,21 @@ function SessionHandler({ children }: { children: React.ReactNode }) {
     // Check for OAuth callback with session parameter
     const params = new URLSearchParams(window.location.search);
     const sessionFromUrl = params.get("session");
+    const existingToken = sessionStorage.getItem("auth_session");
+    
+    console.log("[SessionHandler] URL params:", Object.fromEntries(params));
+    console.log("[SessionHandler] Session from URL:", sessionFromUrl?.substring(0, 10));
+    console.log("[SessionHandler] Existing token:", existingToken?.substring(0, 10));
     
     if (sessionFromUrl) {
+      console.log("[SessionHandler] STORING token:", sessionFromUrl.substring(0, 10));
       sessionStorage.setItem("auth_session", sessionFromUrl);
+      console.log("[SessionHandler] Stored. Cleaning URL...");
       // Clean up URL - remove session param
       window.history.replaceState({}, document.title, window.location.pathname);
+      console.log("[SessionHandler] URL cleaned");
+    } else {
+      console.log("[SessionHandler] No session in URL, checking storage...");
     }
   }, []);
 
