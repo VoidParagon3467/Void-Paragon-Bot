@@ -58,6 +58,24 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
     });
   };
 
+  // Diagnostic endpoint
+  app.get("/api/debug", async (req: Request, res: Response) => {
+    try {
+      const result = await storage.getSession("test_check");
+      res.json({ 
+        status: "ok",
+        message: "Database is connected and auth_sessions table exists"
+      });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({
+        status: "error",
+        message: errorMsg,
+        hint: "auth_sessions table may not exist. Run 'npm run db:push' on Render."
+      });
+    }
+  });
+
   // Discord OAuth endpoints
   app.get("/api/auth/login", (req: Request, res: Response) => {
     const clientId = process.env.DISCORD_CLIENT_ID || "1234567890"; // Placeholder
@@ -179,8 +197,9 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       console.log(`🔐 [Redirect] Sending: ${redirectUrl}`);
       res.redirect(redirectUrl);
     } catch (error) {
-      console.error("❌ [OAuth] Callback error:", error);
-      res.redirect("/?error=callback_failed");
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("❌ [OAuth] Callback error:", errorMsg);
+      res.redirect(`/?error=callback_failed&reason=${encodeURIComponent(errorMsg.substring(0, 50))}`);
     }
   });
 
