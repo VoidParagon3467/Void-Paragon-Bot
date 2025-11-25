@@ -10,6 +10,7 @@ import {
 } from "discord.js";
 import { storage } from "./storage";
 import { cultivationRealms, rankHierarchy } from "@shared/schema";
+import { eventBus } from "./event-bus";
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -1811,6 +1812,15 @@ export class CultivationBot {
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
+
+        // Emit EventBus event for real-time dashboard sync
+        eventBus.emitDashboardAction({
+          type: "meditation_stopped",
+          serverId: interaction.guild.id,
+          userId: user.id,
+          username: user.username,
+          timestamp: new Date(),
+        });
       } else {
         // Start meditation
         await storage.updateUser(user.id, {
@@ -1825,6 +1835,15 @@ export class CultivationBot {
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });
+
+        // Emit EventBus event for real-time dashboard sync
+        eventBus.emitDashboardAction({
+          type: "meditation_started",
+          serverId: interaction.guild.id,
+          userId: user.id,
+          username: user.username,
+          timestamp: new Date(),
+        });
       }
     } catch (error) {
       console.error("Error in handleCultivateCommand:", error);
@@ -2519,6 +2538,20 @@ export class CultivationBot {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
+
+      // Emit EventBus event for real-time dashboard sync
+      eventBus.emitDashboardAction({
+        type: "item_purchased",
+        serverId: interaction.guild.id,
+        userId: user.id,
+        username: user.username,
+        itemId: itemId,
+        itemName: item.name,
+        quantity: quantity,
+        cost: totalCost,
+        newVoidCrystals: user.voidCrystals - totalCost,
+        timestamp: new Date(),
+      });
     } catch (error) {
       console.error("Error in handleBuyCommand:", error);
       await interaction.editReply({
@@ -2586,6 +2619,18 @@ export class CultivationBot {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
+
+      // Emit EventBus event for real-time dashboard sync
+      eventBus.emitDashboardAction({
+        type: "item_equipped",
+        serverId: interaction.guild.id,
+        userId: user.id,
+        username: user.username,
+        itemId: itemId,
+        itemName: userItem.item.name,
+        rarity: userItem.item.rarity,
+        timestamp: new Date(),
+      });
     } catch (error) {
       console.error("Error in handleEquipCommand:", error);
       await interaction.editReply({
@@ -2648,10 +2693,12 @@ export class CultivationBot {
 
       await storage.completeMission(user.id, missionId);
 
+      const newXp = user.xp + userMission.mission.xpReward;
+      const newCrystals = user.voidCrystals + userMission.mission.crystalReward;
+
       await storage.updateUser(user.id, {
-        xp: user.xp + userMission.mission.xpReward,
-        voidCrystals:
-          user.voidCrystals + userMission.mission.crystalReward,
+        xp: newXp,
+        voidCrystals: newCrystals,
       } as any);
 
       const embed = new EmbedBuilder()
@@ -2673,6 +2720,21 @@ export class CultivationBot {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
+
+      // Emit EventBus event for real-time dashboard sync
+      eventBus.emitDashboardAction({
+        type: "mission_completed",
+        serverId: interaction.guild.id,
+        userId: user.id,
+        username: user.username,
+        missionId: missionId,
+        missionTitle: userMission.mission.title,
+        xpReward: userMission.mission.xpReward,
+        crystalReward: userMission.mission.crystalReward,
+        newXp: newXp,
+        newCrystals: newCrystals,
+        timestamp: new Date(),
+      });
     } catch (error) {
       console.error("Error in handleCompleteMissionCommand:", error);
       await interaction.editReply({
