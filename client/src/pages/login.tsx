@@ -1,17 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const redirected = useRef(false);
 
   useEffect(() => {
+    if (redirected.current) return;
+
     // Check if we have a session token from URL (OAuth callback)
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("session");
     
     if (urlToken) {
+      redirected.current = true;
       sessionStorage.setItem("auth_session", urlToken);
       setLocation("/");
       return;
@@ -20,9 +24,10 @@ export default function Login() {
     // Check if we already have a token in storage
     const token = sessionStorage.getItem("auth_session");
     if (token) {
+      redirected.current = true;
       setLocation("/");
     }
-  }, [setLocation]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-blue-900 flex items-center justify-center">
