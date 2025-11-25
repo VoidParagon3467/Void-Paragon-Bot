@@ -48,19 +48,17 @@ function SessionHandler({ children }: { children: React.ReactNode }) {
     const sessionFromUrl = params.get("session");
     const existingToken = sessionStorage.getItem("auth_session");
     
-    console.log("[SessionHandler] URL params:", Object.fromEntries(params));
+    console.log("[SessionHandler] URL search string:", window.location.search);
     console.log("[SessionHandler] Session from URL:", sessionFromUrl?.substring(0, 10));
     console.log("[SessionHandler] Existing token:", existingToken?.substring(0, 10));
     
     if (sessionFromUrl) {
-      console.log("[SessionHandler] STORING token:", sessionFromUrl.substring(0, 10));
+      console.log("[SessionHandler] ✅ FOUND TOKEN IN URL - STORING and reloading");
       sessionStorage.setItem("auth_session", sessionFromUrl);
-      console.log("[SessionHandler] Stored. Cleaning URL...");
-      // Clean up URL - remove session param
-      window.history.replaceState({}, document.title, window.location.pathname);
-      console.log("[SessionHandler] URL cleaned");
+      // Force reload to ensure ProfilePage sees the token
+      window.location.href = "/";
     } else {
-      console.log("[SessionHandler] No session in URL, checking storage...");
+      console.log("[SessionHandler] No session in URL");
     }
   }, []);
 
