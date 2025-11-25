@@ -1,11 +1,11 @@
 import { 
   users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
-  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases, userStrikes,
+  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases, userStrikes, schedulerEvents,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
   type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
   type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
   type Battle, type InsertBattle, type Activity, type InsertActivity,
-  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure, type Event, type EventParticipant
+  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure, type Event, type EventParticipant, type SchedulerEvent
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, gte, lte, count, sql } from "drizzle-orm";
@@ -127,6 +127,10 @@ export interface IStorage {
   // Moderation strikes
   getUserStrikes(userId: number): Promise<any[]>;
   recordStrike(userId: number, strikeCount: number, reason: string, description: string, serverId: string, bannedUntil?: Date): Promise<any>;
+  
+  // Scheduler operations (STRICT TIME-BASED)
+  getSchedulerEvent(serverId: string, eventType: string): Promise<SchedulerEvent | undefined>;
+  updateSchedulerEvent(serverId: string, eventType: string, lastRunAt: Date, nextRunAt?: Date): Promise<SchedulerEvent>;
   
   // Statistics
   getServerStats(serverId: string): Promise<{
@@ -743,6 +747,43 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return strike;
+  }
+
+  async getSchedulerEvent(serverId: string, eventType: string): Promise<SchedulerEvent | undefined> {
+    const [event] = await db
+      .select()
+      .from(schedulerEvents)
+      .where(and(eq(schedulerEvents.serverId, serverId), eq(schedulerEvents.eventType, eventType)))
+      .limit(1);
+    return event;
+  }
+
+  async updateSchedulerEvent(serverId: string, eventType: string, lastRunAt: Date, nextRunAt?: Date): Promise<SchedulerEvent> {
+    const existing = await this.getSchedulerEvent(serverId, eventType);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(schedulerEvents)
+        .set({
+          lastRunAt,
+          nextRunAt: nextRunAt || new Date(lastRunAt.getTime() + 24 * 60 * 60 * 1000),
+          updatedAt: new Date(),
+        })
+        .where(eq(schedulerEvents.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(schedulerEvents)
+        .values({
+          serverId,
+          eventType,
+          lastRunAt,
+          nextRunAt: nextRunAt || new Date(lastRunAt.getTime() + 24 * 60 * 60 * 1000),
+        })
+        .returning();
+      return created;
+    }
   }
 }
 

@@ -926,3 +926,18 @@ export type Weapon = typeof weapons.$inferSelect;
 export type BreakthroughTreasure = typeof breakthroughTreasures.$inferSelect;
 export type Event = typeof events.$inferSelect;
 export type EventParticipant = typeof eventParticipants.$inferSelect;
+
+// Scheduler Events - Tracks last run time for recurring tasks (STRICT TIME-BASED)
+export const schedulerEvents = pgTable("scheduler_events", {
+  id: serial("id").primaryKey(),
+  serverId: text("server_id").notNull(),
+  eventType: text("event_type").notNull(), // 'daily_resources', 'daily_missions', 'daily_events', 'weekly_events', 'monthly_events', 'yearly_events', etc.
+  lastRunAt: timestamp("last_run_at").notNull(),
+  nextRunAt: timestamp("next_run_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSchedulerEventSchema = createInsertSchema(schedulerEvents).omit({ id: true, createdAt: true, updatedAt: true });
+export type SchedulerEvent = typeof schedulerEvents.$inferSelect;
+export type InsertSchedulerEvent = z.infer<typeof insertSchedulerEventSchema>;
