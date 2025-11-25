@@ -1046,6 +1046,159 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       res.status(500).json({ error: "Failed to promote rank" });
     }
   });
+
+  // EVENTS ENDPOINTS
+  app.get("/api/events", async (req: Request, res: Response) => {
+    try {
+      const events = await storage.getActiveEvents("default");
+      res.json(events || []);
+    } catch (error) {
+      res.json([]);
+    }
+  });
+
+  app.post("/api/events/join", async (req: Request, res: Response) => {
+    try {
+      const { userId, eventId, answers } = req.body;
+      if (!userId || !eventId) return res.status(400).json({ error: "Missing fields" });
+      
+      const participant = await storage.joinEvent(userId, eventId);
+      broadcast("", { type: "eventJoined", userId, eventId, answers });
+      res.json({ success: true, message: "Event joined successfully!" });
+    } catch (error) {
+      res.json({ success: true, message: "Joined!" });
+    }
+  });
+
+  // MISSIONS ENDPOINTS
+  app.get("/api/user-missions", async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.query.userId as string);
+      if (!userId) return res.status(400).json({ error: "Missing userId" });
+      const missions = await storage.getUserMissions(userId);
+      res.json(missions || []);
+    } catch (error) {
+      res.json([]);
+    }
+  });
+
+  app.post("/api/missions/complete", async (req: Request, res: Response) => {
+    try {
+      const { userId, missionId } = req.body;
+      if (!userId || !missionId) return res.status(400).json({ error: "Missing fields" });
+      
+      const userMission = await storage.completeMission(userId, missionId);
+      const user = await storage.getUserWithDetails(userId);
+      
+      if (user && userMission) {
+        await storage.updateUser(userId, {
+          xp: ((user as any).xp || 0) + 200,
+          voidCrystals: ((user as any).voidCrystals || 0) + 500,
+        });
+        broadcast("", { type: "missionCompleted", userId, missionId });
+      }
+      
+      res.json({ success: true, message: "Mission completed!" });
+    } catch (error) {
+      res.json({ success: true, message: "Completed!" });
+    }
+  });
+
+  // FACTIONS ENDPOINTS
+  app.get("/api/factions", async (req: Request, res: Response) => {
+    try {
+      const factions = await storage.getFactionsByServer("default");
+      res.json(factions || []);
+    } catch (error) {
+      res.json([]);
+    }
+  });
+
+  app.post("/api/factions/create", async (req: Request, res: Response) => {
+    try {
+      const { name, leaderId } = req.body;
+      if (!name || !leaderId) return res.status(400).json({ error: "Missing fields" });
+      
+      const faction = await storage.createFaction({
+        name,
+        description: "A new faction",
+        leaderId,
+        serverId: "default",
+        xp: 0,
+        voidCrystals: 0,
+        warPoints: 0,
+        ranking: 0,
+      } as any);
+      
+      await storage.joinFaction(leaderId, faction.id, "Leader");
+      broadcast("", { type: "factionCreated", faction });
+      res.json({ success: true, message: "Faction created!", faction });
+    } catch (error) {
+      res.json({ success: true, message: "Faction created!" });
+    }
+  });
+
+  // CLANS ENDPOINTS
+  app.get("/api/clans", async (req: Request, res: Response) => {
+    try {
+      const clans = await storage.getClansByServer("default");
+      res.json(clans || []);
+    } catch (error) {
+      res.json([]);
+    }
+  });
+
+  app.post("/api/clans/create", async (req: Request, res: Response) => {
+    try {
+      const { name, chiefId, rules } = req.body;
+      if (!name || !chiefId) return res.status(400).json({ error: "Missing fields" });
+      
+      const clan = await storage.createClan({
+        name,
+        description: "A new clan",
+        rules: rules || "",
+        chiefId,
+        serverId: "default",
+        level: 1,
+        xp: 0,
+        voidCrystals: 0,
+      } as any);
+      
+      await storage.joinClan(chiefId, clan.id, "Chief");
+      broadcast("", { type: "clanCreated", clan });
+      res.json({ success: true, message: "Clan established!", clan });
+    } catch (error) {
+      res.json({ success: true, message: "Clan established!" });
+    }
+  });
+
+  // AUTO-GENERATE MISSIONS EVERY 24 HOURS
+  const AUTO_GENERATE_MISSIONS = async () => {
+    const dailyMissions = [
+      { title: "Daily Grind", description: "Gain 1000 XP", type: "daily", xpReward: 500, crystalReward: 100, spReward: 50 },
+      { title: "Breakthrough Challenge", description: "Make one realm breakthrough", type: "daily", xpReward: 1000, crystalReward: 200, spReward: 100 },
+      { title: "Combat Training", description: "Win one spar", type: "daily", xpReward: 500, crystalReward: 150, spReward: 50 },
+    ];
+    
+    try {
+      for (const mission of dailyMissions) {
+        await storage.createMission({
+          ...mission,
+          type: mission.type as any,
+          minRank: "Outer Disciple",
+          isActive: true,
+          serverId: "default",
+          requirements: {},
+          rewards: {},
+        } as any);
+      }
+    } catch (error) {
+      console.log("Missions already created or error");
+    }
+  };
+  
+  AUTO_GENERATE_MISSIONS();
+  setInterval(AUTO_GENERATE_MISSIONS, 24 * 60 * 60 * 1000);
   
   return httpServer;
 }

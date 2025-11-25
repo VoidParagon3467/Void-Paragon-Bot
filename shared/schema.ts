@@ -136,11 +136,14 @@ export const factions = pgTable("factions", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  rules: text("rules"), // Faction rules
+  rules: text("rules"),
   leaderId: integer("leader_id"),
+  xp: integer("xp").notNull().default(0),
+  voidCrystals: integer("void_crystals").notNull().default(0),
   warPoints: integer("war_points").notNull().default(0),
   memberCount: integer("member_count").notNull().default(0),
-  hierarchy: jsonb("hierarchy"), // Warden positions and hierarchy
+  ranking: integer("ranking").notNull().default(0),
+  hierarchy: jsonb("hierarchy"),
   icon: text("icon"),
   serverId: text("server_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -151,15 +154,20 @@ export const clans = pgTable("clans", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  rules: text("rules"), // Clan rules
-  chiefId: integer("chief_id"), // Clan chief (equivalent to leader)
-  level: integer("level").notNull().default(1), // Clan levels 1-10
+  rules: text("rules"),
+  chiefId: integer("chief_id"),
+  level: integer("level").notNull().default(1),
   prestige: integer("prestige").notNull().default(0),
+  xp: integer("xp").notNull().default(0),
+  voidCrystals: integer("void_crystals").notNull().default(0),
   memberCount: integer("member_count").notNull().default(0),
-  treasury: integer("treasury").notNull().default(0), // Shared resources
+  treasury: integer("treasury").notNull().default(0),
   warPoints: integer("war_points").notNull().default(0),
-  elderIds: jsonb("elder_ids"), // List of elder user IDs
-  hierarchy: jsonb("hierarchy"), // Clan hierarchy info
+  specialSkillIds: jsonb("special_skill_ids"), // Clan-exclusive skills {skillId, tier}
+  specialWeaponIds: jsonb("special_weapon_ids"), // Clan-exclusive weapons {weaponId, tier}
+  uniqueBloodlineId: integer("unique_bloodline_id"), // Unique clan bloodline
+  elderIds: jsonb("elder_ids"),
+  hierarchy: jsonb("hierarchy"),
   icon: text("icon"),
   serverId: text("server_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -310,11 +318,14 @@ export const missions = pgTable("missions", {
   title: text("title").notNull(),
   description: text("description"),
   type: missionTypeEnum("type").notNull(),
+  minRank: text("min_rank"), // Minimum rank to accept
   requirements: jsonb("requirements"),
   rewards: jsonb("rewards"),
   xpReward: integer("xp_reward").notNull().default(0),
   crystalReward: integer("crystal_reward").notNull().default(0),
+  spReward: integer("sp_reward").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  generatedOn: timestamp("generated_on").defaultNow(),
   serverId: text("server_id").notNull(),
 });
 
@@ -385,11 +396,12 @@ export const events = pgTable("events", {
   type: eventTypeEnum("type").notNull(),
   title: text("title").notNull(),
   description: text("description"),
-  entryCost: integer("entry_cost").notNull().default(0), // VC for weekly, SP for monthly, Karma for yearly
-  entryCostType: text("entry_cost_type").notNull().default("vc"), // 'vc', 'sp', 'karma'
+  entryCost: integer("entry_cost").notNull().default(0),
+  entryCostType: text("entry_cost_type").notNull().default("vc"),
   maxParticipants: integer("max_participants"),
   winnerCount: integer("winner_count").notNull().default(10),
-  rewardPool: jsonb("reward_pool"), // Currencies and items to distribute
+  rewardPool: jsonb("reward_pool"),
+  questionsJson: jsonb("questions_json"), // Array of {id, question, choices}
   startedAt: timestamp("started_at").notNull(),
   endsAt: timestamp("ends_at").notNull(),
   isActive: boolean("is_active").notNull().default(true),
@@ -402,6 +414,7 @@ export const eventParticipants = pgTable("event_participants", {
   eventId: integer("event_id").notNull(),
   userId: integer("user_id").notNull(),
   score: integer("score").notNull().default(0),
+  answers: jsonb("answers"), // {questionId: answerId}
   placement: integer("placement"),
   rewardClaimed: boolean("reward_claimed").notNull().default(false),
   joinedAt: timestamp("joined_at").defaultNow(),
