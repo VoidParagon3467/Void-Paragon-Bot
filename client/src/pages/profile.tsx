@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { realmLevels, rankHierarchy } from "@shared/schema";
 
@@ -34,7 +34,7 @@ export default function ProfilePage() {
     const token = sessionStorage.getItem("auth_session");
     if (!token) setLocation("/login");
     else setSessionToken(token);
-  }, [setLocation]);
+  }, []);
 
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: [`/api/auth/me`, sessionToken],

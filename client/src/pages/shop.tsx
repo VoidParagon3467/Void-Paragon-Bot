@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { ShoppingCart, Gem } from "lucide-react";
 
@@ -36,7 +36,7 @@ export default function ShopPage() {
     const token = sessionStorage.getItem("auth_session");
     if (!token) setLocation("/login");
     else setSessionToken(token);
-  }, [setLocation]);
+  }, []);
 
   const { data: user } = useQuery<User | null>({
     queryKey: [`/api/auth/me`, sessionToken],

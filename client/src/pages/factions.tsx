@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Users } from "lucide-react";
 
@@ -23,7 +23,7 @@ export default function FactionsPage() {
     const token = sessionStorage.getItem("auth_session");
     if (!token) setLocation("/login");
     else setSessionToken(token);
-  }, [setLocation]);
+  }, []);
 
   const { data: user } = useQuery<User | null>({
     queryKey: [`/api/auth/me`, sessionToken],
