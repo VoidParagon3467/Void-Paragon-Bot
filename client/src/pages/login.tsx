@@ -7,6 +7,17 @@ export default function Login() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    // Check if we have a session token from URL (OAuth callback)
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get("session");
+    
+    if (urlToken) {
+      sessionStorage.setItem("auth_session", urlToken);
+      setLocation("/");
+      return;
+    }
+
+    // Check if we already have a token in storage
     const token = sessionStorage.getItem("auth_session");
     if (token) {
       setLocation("/");
