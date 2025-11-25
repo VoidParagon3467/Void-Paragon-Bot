@@ -12,13 +12,13 @@ interface ExtendedWebSocket extends WebSocket {
   serverId?: string;
 }
 
-// In-memory session storage for authentication
-const sessions = new Map<string, { discordId: string; serverId: string; user: any }>();
-
 // Generate simple session token
 function generateSessionToken(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
+
+// Session expiry time (24 hours)
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 export async function registerRoutes(app: Express, botClient?: any): Promise<Server> {
   const httpServer = createServer(app);
@@ -118,15 +118,10 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
         return res.redirect("/?error=no_guild");
       }
 
-      // Store session
+      // Store session in database (24 hour expiry)
       const sessionToken = generateSessionToken();
-      const user = await storage.getUserByDiscordId(userData.id, firstGuild);
-      
-      sessions.set(sessionToken, {
-        discordId: userData.id,
-        serverId: firstGuild,
-        user: user || { id: userData.id, username: userData.username },
-      });
+      const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS);
+      await storage.createSession(sessionToken, userData.id, firstGuild, expiresAt);
 
       // Redirect with token
       res.redirect(`/?session=${sessionToken}`);
@@ -142,12 +137,12 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const session = sessions.get(sessionToken);
-    if (!session) {
-      return res.status(401).json({ error: "Invalid session" });
-    }
-
     try {
+      const session = await storage.getSession(sessionToken);
+      if (!session) {
+        return res.status(401).json({ error: "Invalid or expired session" });
+      }
+
       const user = await storage.getUserByDiscordId(session.discordId, session.serverId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -159,12 +154,16 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
     }
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
-    const sessionToken = req.body.sessionToken || (req.query.session as string);
-    if (sessionToken) {
-      sessions.delete(sessionToken);
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
+    try {
+      const sessionToken = req.body.sessionToken || (req.query.session as string);
+      if (sessionToken) {
+        await storage.deleteSession(sessionToken);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to logout" });
     }
-    res.json({ success: true });
   });
 
   // Chapter announcement webhook for Jadescrolls integration

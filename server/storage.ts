@@ -1,11 +1,11 @@
 import { 
   users, bloodlines, factions, clans, tokens, items, userItems, missions, userMissions, 
-  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases, userStrikes, schedulerEvents,
+  battles, activities, serverSettings, divineBodies, daos, titles, weapons, breakthroughTreasures, events, eventParticipants, premiumPurchases, userStrikes, schedulerEvents, authSessions,
   type User, type InsertUser, type Bloodline, type InsertBloodline,
   type Faction, type InsertFaction, type Clan, type InsertClan, type Token, type InsertToken,
   type Item, type InsertItem, type UserItem, type Mission, type InsertMission, type UserMission,
   type Battle, type InsertBattle, type Activity, type InsertActivity,
-  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure, type Event, type EventParticipant, type SchedulerEvent
+  type ServerSettings, type InsertServerSettings, type DivineBody, type Dao, type Title, type Weapon, type BreakthroughTreasure, type Event, type EventParticipant, type SchedulerEvent, type AuthSession
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, gte, lte, count, sql } from "drizzle-orm";
@@ -123,6 +123,12 @@ export interface IStorage {
   // Server settings
   getServerSettings(serverId: string): Promise<ServerSettings | undefined>;
   updateServerSettings(serverId: string, updates: Partial<ServerSettings>): Promise<ServerSettings>;
+
+  // Auth session operations
+  createSession(sessionId: string, discordId: string, serverId: string, expiresAt: Date): Promise<AuthSession>;
+  getSession(sessionId: string): Promise<AuthSession | undefined>;
+  deleteSession(sessionId: string): Promise<void>;
+  deleteExpiredSessions(): Promise<void>;
   
   // Moderation strikes
   getUserStrikes(userId: number): Promise<any[]>;
@@ -784,6 +790,31 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async createSession(sessionId: string, discordId: string, serverId: string, expiresAt: Date): Promise<AuthSession> {
+    const [session] = await db
+      .insert(authSessions)
+      .values({ id: sessionId, discordId, serverId, expiresAt })
+      .returning();
+    return session;
+  }
+
+  async getSession(sessionId: string): Promise<AuthSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(authSessions)
+      .where(and(eq(authSessions.id, sessionId), gte(authSessions.expiresAt, new Date())))
+      .limit(1);
+    return session;
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await db.delete(authSessions).where(eq(authSessions.id, sessionId));
+  }
+
+  async deleteExpiredSessions(): Promise<void> {
+    await db.delete(authSessions).where(lte(authSessions.expiresAt, new Date()));
   }
 }
 

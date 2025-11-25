@@ -938,6 +938,19 @@ export const schedulerEvents = pgTable("scheduler_events", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Auth Sessions - Persists across bot restarts
+export const authSessions = pgTable("auth_sessions", {
+  id: text("id").primaryKey(),
+  discordId: text("discord_id").notNull(),
+  serverId: text("server_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertSchedulerEventSchema = createInsertSchema(schedulerEvents).omit({ id: true, createdAt: true, updatedAt: true });
 export type SchedulerEvent = typeof schedulerEvents.$inferSelect;
 export type InsertSchedulerEvent = z.infer<typeof insertSchedulerEventSchema>;
+
+export const insertAuthSessionSchema = createInsertSchema(authSessions).omit({ createdAt: true });
+export type AuthSession = typeof authSessions.$inferSelect;
+export type InsertAuthSession = z.infer<typeof insertAuthSessionSchema>;
