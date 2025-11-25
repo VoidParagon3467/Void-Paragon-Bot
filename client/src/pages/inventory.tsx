@@ -81,21 +81,14 @@ export default function InventoryPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      refetchItems();
-      refetchUser();
-      if (data.message) {
-        toast({
-          title: "Item Used!",
-          description: data.message,
-        });
-      }
-    },
-    onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to use item",
-        variant: "destructive",
+        title: "Success!",
+        description: data.message,
       });
+      setTimeout(() => {
+        refetchItems();
+        refetchUser();
+      }, 100);
     },
   });
 
@@ -184,10 +177,10 @@ export default function InventoryPage() {
                     <Button
                       size="sm"
                       onClick={() => handleUseItem(item.id, 'weapon')}
-                      disabled={useItemMutation.isPending}
                       data-testid={`button-equip-${item.id}`}
+                      className="active-elevate-2"
                     >
-                      {useItemMutation.isPending ? "..." : "Equip"}
+                      Equip
                     </Button>
                   </CardContent>
                 </Card>
@@ -219,10 +212,10 @@ export default function InventoryPage() {
                     <Button
                       size="sm"
                       onClick={() => handleUseItem(item.id, 'pill')}
-                      disabled={useItemMutation.isPending}
                       data-testid={`button-use-pill-${item.id}`}
+                      className="active-elevate-2"
                     >
-                      {useItemMutation.isPending ? "..." : "Use"}
+                      Use
                     </Button>
                   </CardContent>
                 </Card>
@@ -251,10 +244,10 @@ export default function InventoryPage() {
                     <Button
                       size="sm"
                       onClick={() => handleUseItem(item.id, 'treasure')}
-                      disabled={useItemMutation.isPending}
                       data-testid={`button-use-treasure-${item.id}`}
+                      className="active-elevate-2"
                     >
-                      {useItemMutation.isPending ? "..." : "Use"}
+                      Use
                     </Button>
                   </CardContent>
                 </Card>
@@ -283,10 +276,10 @@ export default function InventoryPage() {
                     <Button
                       size="sm"
                       onClick={() => handleUseItem(item.id, 'bloodline')}
-                      disabled={useItemMutation.isPending}
                       data-testid={`button-activate-bloodline-${item.id}`}
+                      className="active-elevate-2"
                     >
-                      {useItemMutation.isPending ? "..." : "Activate"}
+                      Activate
                     </Button>
                   </CardContent>
                 </Card>
@@ -315,10 +308,10 @@ export default function InventoryPage() {
                     <Button
                       size="sm"
                       onClick={() => handleUseItem(item.id, 'skill')}
-                      disabled={useItemMutation.isPending}
                       data-testid={`button-learn-skill-${item.id}`}
+                      className="active-elevate-2"
                     >
-                      {useItemMutation.isPending ? "..." : "Learn"}
+                      Learn
                     </Button>
                   </CardContent>
                 </Card>

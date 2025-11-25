@@ -79,19 +79,11 @@ export default function ShopPage() {
 
   const handleBuy = async (itemId: number, currency: string) => {
     if (!user?.id) return;
-    try {
-      const res = await fetch(`/api/shop/buy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, itemId, currency }),
-      });
-      if (res.ok) {
-        // WebSocket will broadcast update
-        alert("Item purchased!");
-      }
-    } catch (error) {
-      console.error("Purchase failed:", error);
-    }
+    fetch(`/api/shop/buy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, itemId, currency }),
+    }).catch(() => {});
   };
 
   if (!user) return <div className="p-8">Loading...</div>;
@@ -142,6 +134,7 @@ export default function ShopPage() {
                     disabled={user.voidCrystals < item.price}
                     onClick={() => handleBuy(item.id, "vc")}
                     data-testid={`button-buy-vc-${item.id}`}
+                    className="active-elevate-2"
                   >
                     Buy
                   </Button>
@@ -169,6 +162,7 @@ export default function ShopPage() {
                     disabled={user.sectPoints < item.price}
                     onClick={() => handleBuy(item.id, "sp")}
                     data-testid={`button-buy-sp-${item.id}`}
+                    className="active-elevate-2"
                   >
                     Buy
                   </Button>
@@ -196,6 +190,7 @@ export default function ShopPage() {
                     disabled={user.karma < item.price}
                     onClick={() => handleBuy(item.id, "karma")}
                     data-testid={`button-buy-karma-${item.id}`}
+                    className="active-elevate-2"
                   >
                     Buy
                   </Button>
