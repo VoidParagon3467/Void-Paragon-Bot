@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { Gift } from "lucide-react";
+import { Gift, Check } from "lucide-react";
 
 interface User {
   id: number;
@@ -12,8 +12,20 @@ interface User {
   rank: string;
   realm: string;
   level: number;
-  voidCrystals: number;
+  isPremium?: boolean;
 }
+
+const RANK_BENEFITS: Record<string, string[]> = {
+  "Outer Disciple": ["Basic inventory (3 slots)", "Access to VC Shop", "Daily login bonus"],
+  "Inner Disciple": ["Expanded inventory (5 slots)", "Access to SP Shop", "Weekly rewards"],
+  "Core Disciple": ["Large inventory (7 slots)", "Rare item drops", "Monthly events"],
+  "Inheritor Disciple": ["Premium inventory (10 slots)", "Faction creation", "Priority in battles"],
+  "Guardians": ["VIP inventory (15 slots)", "Moderation tools", "Guild bonuses"],
+  "Elder": ["Vast inventory (20 slots)", "Treasury access", "Event creation"],
+  "Great Elder": ["Legendary inventory (30 slots)", "Clan creation", "Custom titles"],
+  "Heavenly Elder": ["Infinite inventory (50 slots)", "All permissions", "Special rewards"],
+  "Supreme Sect Master": ["Unlimited everything", "Full admin control", "Event god mode"],
+};
 
 export default function PremiumPage() {
   const [, setLocation] = useLocation();
@@ -42,30 +54,86 @@ export default function PremiumPage() {
 
   if (!user) return <div className="p-8">Loading...</div>;
 
+  const userBenefits = RANK_BENEFITS[user.rank] || RANK_BENEFITS["Outer Disciple"];
+
   return (
     <DashboardLayout user={user} onLogout={handleLogout}>
       <div className="p-6 space-y-6">
         <div className="flex items-center gap-2">
           <Gift className="w-6 h-6" />
-          <h1 className="text-3xl font-bold">Premium Benefits</h1>
+          <h1 className="text-3xl font-bold">Benefits & Perks</h1>
         </div>
-        <Card>
+
+        {/* Current Rank Benefits */}
+        <Card className="border-l-4 border-l-amber-500 bg-gradient-to-r from-amber-500/5">
           <CardHeader>
-            <CardTitle>Premium Membership</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Your Rank: {user.rank}</CardTitle>
+              <Badge className="text-lg py-1 px-3">{user.realm} Lvl {user.level}</Badge>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-muted-foreground">Premium features are available through your rank. Your current rank provides access to all features for your level.</p>
-            <div className="mt-4 p-4 bg-muted rounded-md">
-              <p className="text-sm font-medium">Your Benefits</p>
-              <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                <li>• Access to all available shop items</li>
-                <li>• Full inventory capacity</li>
-                <li>• Participation in missions and events</li>
-                <li>• Spar and PvP combat (coming soon)</li>
+            <div>
+              <p className="text-sm text-muted-foreground mb-3">Current benefits unlocked:</p>
+              <ul className="space-y-2">
+                {userBenefits.map((benefit, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm">
+                    <Check className="w-4 h-4 mt-0.5 flex-shrink-0 text-green-500" />
+                    <span>{benefit}</span>
+                  </li>
+                ))}
               </ul>
             </div>
           </CardContent>
         </Card>
+
+        {/* How to Progress */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Rise in Rank</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div>
+              <p className="font-bold mb-2">To advance your rank:</p>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Gain XP through missions and activities</li>
+                <li>• Participate in events and spars</li>
+                <li>• Earn Sect Points and complete challenges</li>
+                <li>• Seek promotion from Elders or the Supreme Sect Master</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* All Rank Tiers */}
+        <div>
+          <h2 className="text-xl font-bold mb-4">All Rank Tiers</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(RANK_BENEFITS).map(([rank, benefits]) => (
+              <Card 
+                key={rank}
+                className={rank === user.rank ? "border-amber-500 border-2 bg-amber-500/5" : ""}
+              >
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center justify-between">
+                    {rank}
+                    {rank === user.rank && <Badge>Current</Badge>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {benefits.map((benefit, idx) => (
+                      <li key={idx} className="flex items-start gap-1">
+                        <Check className="w-3 h-3 mt-0.5 flex-shrink-0 text-green-500" />
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );

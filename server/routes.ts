@@ -814,6 +814,188 @@ export async function registerRoutes(app: Express, botClient?: any): Promise<Ser
       res.status(500).json({ error: "Failed to use item" });
     }
   });
+
+  // Spar endpoints
+  app.get("/api/spar/opponents", async (req: Request, res: Response) => {
+    try {
+      const userId = req.query.userId ? parseInt(req.query.userId as string) : null;
+      if (!userId) {
+        return res.status(400).json({ error: "Missing userId" });
+      }
+
+      // Get leaderboard (available users) except current user
+      const leaderboard = await storage.getLeaderboard("default", 10);
+      const opponents = (leaderboard as any[])
+        .filter(u => u.id !== userId)
+        .map(u => ({
+          id: u.id,
+          username: u.username,
+          rank: u.rank,
+          realm: u.realm,
+          level: u.level,
+        }));
+
+      res.json(opponents);
+    } catch (error) {
+      console.error("Spar opponents error:", error);
+      res.status(500).json({ error: "Failed to fetch opponents" });
+    }
+  });
+
+  app.post("/api/spar/battle", async (req: Request, res: Response) => {
+    try {
+      const { attackerId, defenderId } = req.body;
+      if (!attackerId || !defenderId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const attacker = await storage.getUserWithDetails(attackerId);
+      const defender = await storage.getUserWithDetails(defenderId);
+
+      if (!attacker || !defender) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Simple battle calculation
+      const attackerPower = ((attacker as any).level || 1) * 10;
+      const defenderPower = ((defender as any).level || 1) * 10;
+      
+      const rand = Math.random();
+      let result: "win" | "lose" | "draw";
+      
+      if (rand < 0.4) result = "win";
+      else if (rand < 0.8) result = "lose";
+      else result = "draw";
+
+      const xpGained = result === "win" ? Math.floor(defenderId * 0.5) : Math.floor(defenderId * 0.25);
+      const crystalsGained = result === "win" ? Math.floor(defenderId * 2) : 0;
+
+      // Update attacker stats
+      const updatedAttacker = await storage.updateUser(attackerId, {
+        xp: ((attacker as any).xp || 0) + xpGained,
+        voidCrystals: ((attacker as any).voidCrystals || 0) + crystalsGained,
+      });
+
+      const narratives: Record<string, string> = {
+        win: `⚔️ ${(attacker as any).username} defeated ${(defender as any).username} in combat!`,
+        lose: `${(attacker as any).username} was overpowered by ${(defender as any).username}...`,
+        draw: `⚔️ An epic stalemate between ${(attacker as any).username} and ${(defender as any).username}!`,
+      };
+
+      broadcast("", {
+        type: "battleCompleted",
+        attackerId,
+        defenderId,
+        result,
+        narrative: narratives[result],
+      });
+
+      res.json({
+        success: true,
+        result,
+        narrative: narratives[result],
+        xpGained,
+        crystalsGained,
+      });
+    } catch (error) {
+      console.error("Battle error:", error);
+      res.status(500).json({ error: "Failed to execute battle" });
+    }
+  });
+
+  // Admin endpoints
+  app.get("/api/admin/disciples", async (req: Request, res: Response) => {
+    try {
+      const leaderboard = await storage.getLeaderboard("default", 50);
+      const disciples = (leaderboard as any[])
+        .map(u => ({
+          id: u.id,
+          username: u.username,
+          rank: u.rank,
+          realm: u.realm,
+          level: u.level,
+        }));
+
+      res.json(disciples);
+    } catch (error) {
+      console.error("Disciples list error:", error);
+      res.status(500).json({ error: "Failed to fetch disciples" });
+    }
+  });
+
+  app.post("/api/admin/discipline", async (req: Request, res: Response) => {
+    try {
+      const { userId, action, reason } = req.body;
+      if (!userId || !action) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const user = await storage.getUserWithDetails(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Log the discipline action
+      broadcast("", {
+        type: "disciplineAction",
+        userId,
+        action,
+        reason,
+        username: (user as any).username,
+      });
+
+      res.json({ 
+        success: true, 
+        message: `${(user as any).username} has been ${action}ed` 
+      });
+    } catch (error) {
+      console.error("Discipline error:", error);
+      res.status(500).json({ error: "Failed to apply discipline" });
+    }
+  });
+
+  app.post("/api/admin/promote-rank", async (req: Request, res: Response) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "Missing userId" });
+      }
+
+      const user = await storage.getUserWithDetails(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const rankOrder = [
+        "Outer Disciple", "Inner Disciple", "Core Disciple", "Inheritor Disciple",
+        "Guardians", "Elder", "Great Elder", "Heavenly Elder", "Supreme Sect Master"
+      ];
+      
+      const currentRankIndex = rankOrder.indexOf((user as any).rank);
+      if (currentRankIndex === -1 || currentRankIndex === rankOrder.length - 1) {
+        return res.status(400).json({ error: "Cannot promote further" });
+      }
+
+      const newRank = rankOrder[currentRankIndex + 1];
+      const updatedUser = await storage.updateUser(userId, { rank: newRank });
+
+      broadcast("", {
+        type: "rankPromoted",
+        userId,
+        username: (user as any).username,
+        newRank,
+      });
+
+      res.json({ 
+        success: true, 
+        message: `${(user as any).username} promoted to ${newRank}`,
+        newRank
+      });
+    } catch (error) {
+      console.error("Promote rank error:", error);
+      res.status(500).json({ error: "Failed to promote rank" });
+    }
+  });
   
   return httpServer;
 }
