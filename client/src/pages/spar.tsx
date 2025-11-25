@@ -51,13 +51,10 @@ export default function SparPage() {
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Spar with Other Disciples</CardTitle>
+            <CardTitle>Spar System</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">Choose an opponent for friendly combat.</p>
-            <Button disabled data-testid="button-spar-start">
-              Find Opponent
-            </Button>
+          <CardContent>
+            <p className="text-muted-foreground">Combat system coming soon. Train in other areas first!</p>
           </CardContent>
         </Card>
       </div>

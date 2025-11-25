@@ -119,91 +119,14 @@ export default function AdminPage() {
           </Card>
         </div>
 
-        {/* Admin Sections */}
-        <Tabs defaultValue="disciples" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="disciples"><Users className="w-4 h-4" /></TabsTrigger>
-            <TabsTrigger value="events"><Zap className="w-4 h-4" /></TabsTrigger>
-            <TabsTrigger value="resources"><Gem className="w-4 h-4" /></TabsTrigger>
-            <TabsTrigger value="ranks"><Users className="w-4 h-4" /></TabsTrigger>
-            <TabsTrigger value="missions"><BookOpen className="w-4 h-4" /></TabsTrigger>
-            <TabsTrigger value="logs"><LogOut className="w-4 h-4" /></TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="disciples">
-            <Card>
-              <CardHeader>
-                <CardTitle>Disciples Management</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">Ban, punish, warn, or expel disciples</p>
-                <Button disabled>Manage Disciples</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="events">
-            <Card>
-              <CardHeader>
-                <CardTitle>Events Control</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">Create, configure, and manage sect events</p>
-                <Button disabled>Create Event</Button>
-                <Button disabled>Configure Events</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="resources">
-            <Card>
-              <CardHeader>
-                <CardTitle>Resources Control</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">Manage sect resources, daily rewards, and allocations</p>
-                <Button disabled>Manage Treasury</Button>
-                <Button disabled>Set Daily Rewards</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="ranks">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ranks Control</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">Grant rank, raise realms, raise level for disciples</p>
-                <Button disabled>Manage Ranks</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="missions">
-            <Card>
-              <CardHeader>
-                <CardTitle>Missions Control</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-muted-foreground">Configure missions, set rewards, give missions</p>
-                <Button disabled>Create Mission</Button>
-                <Button disabled>Configure Missions</Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="logs">
-            <Card>
-              <CardHeader>
-                <CardTitle>Bot Logs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Reports of all activity in the sect</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Controls</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-sm">Advanced controls coming soon. Currently monitoring sect statistics above.</p>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

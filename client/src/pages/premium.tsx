@@ -53,8 +53,17 @@ export default function PremiumPage() {
           <CardHeader>
             <CardTitle>Premium Membership</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">Unlock exclusive rewards and benefits!</p>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">Premium features are available through your rank. Your current rank provides access to all features for your level.</p>
+            <div className="mt-4 p-4 bg-muted rounded-md">
+              <p className="text-sm font-medium">Your Benefits</p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                <li>• Access to all available shop items</li>
+                <li>• Full inventory capacity</li>
+                <li>• Participation in missions and events</li>
+                <li>• Spar and PvP combat (coming soon)</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
       </div>
